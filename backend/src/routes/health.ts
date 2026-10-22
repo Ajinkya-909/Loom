@@ -3,7 +3,7 @@ import { prisma } from '../db/prisma';
 
 const router = Router();
 
-router.get('/health', async (_req: Request, res: Response) => {
+router.get(['/health', '/api/health'], async (_req: Request, res: Response) => {
   let dbStatus = 'disconnected';
 
   try {
