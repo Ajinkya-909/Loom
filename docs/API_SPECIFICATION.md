@@ -77,25 +77,27 @@
 
 ### 2.1 Ingest Chat Capture
 * **Endpoint:** `POST /api/captures`
-* **Purpose:** Primary entry point for captured conversations. Receives the raw HTML snapshot, extracted message payloads, metadata, and rescued binary assets from the Chrome extension. Stores raw data, dedupes against existing captures, and kicks off normalization to generate `context.md` (and optionally `summary.md`).
-* **Authentication:** Required `Authorization: Bearer <API_TOKEN>`
+* **Purpose:** Primary entry point for captured conversations. Designed for a **zero-trust, lightweight extension model**: the extension only needs to save and upload raw files (HTML snapshot and assets, similar to browser `Ctrl + S`). The backend automatically detects the AI platform, extracts conversation turns (User prompts and Assistant responses), cleans UI noise, converts tables to Markdown, preserves code fences with language tags, compiles canonical `context.md`, deduplicates, and saves everything to disk and PostgreSQL.
+* **Authentication:** Optional `Authorization: Bearer <API_TOKEN>` (local single-user default)
 * **Content-Type:** `multipart/form-data`
 * **Request Multipart Fields:**
 
-| Field Name | Type | Description |
-|---|---|---|
-| `meta` | `text (JSON string)` | Capture metadata: platform, source URL, title, capture mode, expected counts. |
-| `messages` | `text (JSON string)` | Array of raw message objects extracted by content script. |
-| `snapshot` | `file (text/html)` | Full DOM snapshot of the chat page (safety net backup). |
-| `assets` | `file[] (binary)` | One or more binary files (images/diagrams) rescued from the chat. |
+| Field Name | Type | Required | Description |
+|---|---|---|---|
+| `snapshot` | `file (text/html)` | **Conditional\*** | Full raw HTML file (e.g. browser saved web page or DOM snapshot). **Recommended**. |
+| `assets` | `file[] (binary)` | Optional | Images, diagrams, screenshots, or stylesheets saved alongside the chat session. |
+| `meta` | `text (JSON string)` | Optional | Optional metadata overrides: `{ "title"?, "sourceUrl"?, "platform"?, "mode"? }`. Auto-detected if omitted. |
+| `messages` | `text (JSON string)` | **Conditional\*** | Optional pre-parsed messages array. If omitted, backend scrapes `snapshot` HTML. |
 
-#### Example `meta` JSON payload:
+*\* Note: At least one of `snapshot` (HTML file) or `messages` (JSON string) must be provided.*
+
+#### Example `meta` JSON payload (Optional):
 ```json
 {
-  "platform": "CHATGPT",
-  "sourceUrl": "https://chatgpt.com/c/6789-abcd-1234",
-  "title": "Refactoring Auth Middleware",
-  "mode": "CONTEXT_ONLY", // Options: "CONTEXT_ONLY" | "SUMMARIZE"
+  "platform": "CHATGPT",                        // Auto-detected if omitted
+  "sourceUrl": "https://chatgpt.com/c/6789-abcd", // Auto-detected from canonical links if omitted
+  "title": "Refactoring Auth Middleware",        // Auto-extracted from <title> if omitted
+  "mode": "CONTEXT_ONLY",                        // "CONTEXT_ONLY" (default) | "SUMMARIZE"
   "stats": {
     "expectedMessages": 14,
     "expectedCodeBlocks": 5,
@@ -104,7 +106,7 @@
 }
 ```
 
-#### Example `messages` JSON payload:
+#### Example `messages` JSON payload (Optional fallback):
 ```json
 [
   {
@@ -123,23 +125,37 @@
 ```
 
 * **Internal Processing Lifecycle:**
-  1. **Token Verification:** Validates the bearer token against `.env` `API_TOKEN`.
-  2. **Hash & Deduplication:** Computes SHA-256 `contentHash` over the ordered plain text of all messages.
-  3. **Chat Entity Resolution:** Checks if a `Chat` exists matching `(sourceUrl, platform)`. If not, creates a new `Chat`.
-  4. **Deduplication Check:** If the latest version of this chat has the exact same `contentHash`, returns existing capture info with `"duplicate": true` (skips duplicate processing).
-  5. **Version Incrementation:** Determines `version = currentMaxVersion + 1`.
-  6. **Storage Directory Preparation:** Creates `storage/captures/<chatId>/v<version>/raw/` and `storage/captures/<chatId>/v<version>/assets/`.
-  7. **Raw File Ingestion:** Saves `snapshot.html` and `messages.json` to the `raw/` folder. Writes uploaded binary assets to `assets/`.
-  8. **Database Records Creation:**
-     * Creates a `Job` record with `type: INGEST_AND_NORMALIZE`, `status: RUNNING`, `progress: 0.1`.
-     * Creates a `Capture` record with `version`, `contentHash`, `status: PROCESSING`, and `rawPath`.
-  9. **Asynchronous Normalization Execution:**
-     * Parses messages into structured `blocks` (code blocks with detected language, paragraphs, tables, diagram blocks).
-     * Inserts `Message` records.
-     * Inserts `Asset` records, rewriting message image references to local `/api/assets/<assetId>` endpoints.
-     * **Compiles `context.md`:** Generates clean canonical request-response markdown, writes it to `storage/captures/<chatId>/v<version>/context.md`, and creates an `Output` record with `kind: CONTEXT`.
-     * **Conditional Distillation:** If `meta.mode === "SUMMARIZE"`, pipes `context.md` into Gemma (or Gemini fallback), compiles `summary.md`, writes it to disk, and creates an `Output` record with `kind: SUMMARY`.
-     * Updates `Job` (`status: COMPLETED`, `progress: 1.0`) and `Capture` (`status: READY`).
+  1. **Multipart Parsing:** Multer receives and buffers incoming files (`snapshot`, `assets`) and fields (`meta`, `messages`).
+  2. **Metadata & Content Ingestion (Two Paths):**
+     * **Path A (Raw HTML Snapshot — Default):** If `messages` is omitted, the backend's server-side `htmlScraper` parses `snapshot.html`:
+       - Auto-detects platform (`CHATGPT`, `CLAUDE`, `GEMINI`, `DEEPSEEK`, `PERPLEXITY`, `GENERIC`).
+       - Extracts clean chat title from `<title>` (cleans platform suffixes like ` - ChatGPT`).
+       - Extracts canonical `sourceUrl` from `<link rel="canonical">`, OpenGraph tags, or thread links.
+       - Scrapes conversation turns:
+         - **User Turns:** Cleans reaction badges, copy/edit action buttons, and extracts clean prompt text.
+         - **Assistant Turns:** Converts HTML tables (`<table>`) to Markdown tables, extracts code fences (`<pre><code>`) with syntax language tags, processes bulleted/numbered lists, blockquotes, and headings with zero content loss.
+     * **Path B (Pre-Parsed Payload):** If `messages` is provided by the client, it is validated against `messagesSchema`.
+  3. **Hash & Deduplication:** Computes SHA-256 `contentHash` over the ordered text of all messages.
+  4. **Chat Entity Resolution:** Resolves or creates a `Chat` record keyed by `(sourceUrl, platform)`.
+  5. **Deduplication Check:** If the latest version of this chat has the exact same `contentHash`, returns existing capture info with `"duplicate": true` (skips redundant processing and storage).
+  6. **Version Incrementation:** Determines `version = latestCapture.version + 1` (or `1` for new chats).
+  7. **Storage Directory Preparation:** Creates `storage/captures/<chatId>/v<version>/raw/` and `storage/captures/<chatId>/v<version>/assets/`.
+  8. **Raw File Persistence:**
+     - Saves `snapshot.html` to `raw/snapshot.html`.
+     - Saves `messages.json` to `raw/messages.json`.
+     - Saves each uploaded asset to `assets/<assetId>.<ext>`.
+  9. **Database Records Creation:**
+     - Creates `Capture` record with `version`, `contentHash`, `status: PROCESSING`, `rawPath`.
+     - Creates `Job` record with `type: INGEST_AND_NORMALIZE`, `status: RUNNING`.
+     - Inserts `Asset` records linked to specific message indices.
+  10. **Normalization Pipeline (Core Engine):**
+      - Parses each message into typed `Block[]` (`text`, `code`, `table`, `diagram`).
+      - Inserts `Message` records with typed blocks and token estimates.
+      - **Compiles Canonical `context.md`:** Builds the request-response Markdown transcript adhering to PRODUCT_SPEC.md §4.1 with embedded asset links (`![Asset](assets/<id>.<ext>)`).
+      - Writes `context.md` to `storage/captures/<chatId>/v<version>/context.md`.
+      - Creates `Output` record with `kind: CONTEXT`.
+  11. **Finalization:** Updates `Job` (`status: COMPLETED`, `progress: 1.0`) and `Capture` (`status: READY`).
+  12. **Response (`202 Accepted`):** Returns complete identifiers and viewer URL.
 
 * **Success Response (`202 Accepted`):**
   ```json
@@ -148,7 +164,7 @@
     "captureId": "c7a8b9d0-12e3-4f5a-6b7c-8d9e0f1a2b3c",
     "version": 1,
     "jobId": "f1e2d3c4-5b6a-7c8d-9e0f-1a2b3c4d5e6f",
-    "status": "PROCESSING",
+    "status": "READY",
     "viewerUrl": "/c/c7a8b9d0-12e3-4f5a-6b7c-8d9e0f1a2b3c",
     "duplicate": false
   }
