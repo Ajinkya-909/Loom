@@ -10,15 +10,149 @@ generator client {
 }
 
 // ==============================================================================
-// NOTE: The model below is boilerplate/dummy starter schema for initial setup.
-// Replace or expand this model when implementing core domain entities.
+// ENUMS
 // ==============================================================================
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  @@map("users")
+enum Platform {
+  CHATGPT
+  CLAUDE
+  GEMINI
+  DEEPSEEK
+  PERPLEXITY
+  GENERIC
+}
+
+enum CaptureStatus {
+  QUEUED
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum OutputKind {
+  CONTEXT
+  SUMMARY
+}
+
+enum JobType {
+  INGEST_AND_NORMALIZE
+  SUMMARIZE
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// ==============================================================================
+// CORE MODELS
+// ==============================================================================
+
+/// High-level conversation thread across multiple visits and saves.
+model Chat {
+  id        String    @id @default(uuid())
+  platform  Platform
+  sourceUrl String    @map("source_url") @db.VarChar(1024)
+  title     String    @db.VarChar(255)
+  tags      Json      @default("[]")
+  captures  Capture[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([sourceUrl])
+  @@index([platform])
+  @@map("chats")
+}
+
+/// Point-in-time snapshot / version of a chat.
+model Capture {
+  id          String        @id @default(uuid())
+  chatId      String        @map("chat_id")
+  chat        Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  version     Int           @default(1)
+  contentHash String        @map("content_hash") @db.VarChar(64)
+  status      CaptureStatus @default(QUEUED)
+  rawPath     String        @map("raw_path") @db.VarChar(512)
+  stats       Json          @default("{}")
+  messages    Message[]
+  assets      Asset[]
+  outputs     Output[]
+  jobs        Job[]
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  @@index([chatId, version])
+  @@index([contentHash])
+  @@map("captures")
+}
+
+/// Structured prompt-response message transcript.
+model Message {
+  id            String      @id @default(uuid())
+  captureId     String      @map("capture_id")
+  capture       Capture     @relation(fields: [captureId], references: [id], onDelete: Cascade)
+  idx           Int
+  role          MessageRole
+  textPlain     String      @map("text_plain") @db.Text
+  blocks        Json        @default("[]")
+  tokenEstimate Int         @default(0) @map("token_estimate")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@index([captureId, idx])
+  @@map("messages")
+}
+
+/// Extracted image, chart, or file attachment rescued from chat session.
+model Asset {
+  id          String   @id @default(uuid())
+  captureId   String   @map("capture_id")
+  capture     Capture  @relation(fields: [captureId], references: [id], onDelete: Cascade)
+  messageIdx  Int      @map("message_idx")
+  mime        String   @db.VarChar(100)
+  originalUrl String?  @map("original_url") @db.Text
+  localPath   String   @map("local_path") @db.VarChar(512)
+  sha256      String   @db.VarChar(64)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([captureId])
+  @@map("assets")
+}
+
+/// Generated markdown deliverable (context.md or summary.md).
+model Output {
+  id          String     @id @default(uuid())
+  captureId   String     @map("capture_id")
+  capture     Capture    @relation(fields: [captureId], references: [id], onDelete: Cascade)
+  kind        OutputKind
+  markdown    String     @db.Text
+  filePath    String     @map("file_path") @db.VarChar(512)
+  generatedBy Json       @default("{}") @map("generated_by")
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  @@index([captureId, kind])
+  @@map("outputs")
+}
+
+/// Asynchronous pipeline worker execution tracker.
+model Job {
+  id        String    @id @default(uuid())
+  captureId String    @map("capture_id")
+  capture   Capture   @relation(fields: [captureId], references: [id], onDelete: Cascade)
+  type      JobType
+  stage     String    @default("queued") @db.VarChar(50)
+  status    JobStatus @default(PENDING)
+  progress  Float     @default(0.0)
+  error     String?   @db.Text
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([captureId])
+  @@map("jobs")
 }

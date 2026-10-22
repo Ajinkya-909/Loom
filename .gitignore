@@ -20,6 +20,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Storage
+storage/*
+!storage/**/.gitkeep
+backend/storage/*
+!backend/storage/**/.gitkeep
+
 # OS / Editor
 .DS_Store
 Thumbs.db
