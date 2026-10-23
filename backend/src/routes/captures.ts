@@ -449,6 +449,292 @@ router.post('/api/captures', captureUpload, async (req: Request, res: Response) 
 });
 
 // ============================================================================
+// GET /api/captures — Capture Library & Full-Text Search
+//
+// Query parameters:
+//   - q (string, optional): Title or message content search
+//   - platform (enum, optional): Filter by AI platform (e.g. CHATGPT, CLAUDE, etc.)
+//   - limit (integer, default: 20, max: 100): Pagination limit
+//   - cursor (string, optional): Chat ID for keyset pagination
+// ============================================================================
+router.get('/api/captures', async (req: Request, res: Response) => {
+  try {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : undefined;
+    const platformQuery = typeof req.query.platform === 'string' ? req.query.platform.toUpperCase() : undefined;
+    const limitQuery = parseInt(req.query.limit as string, 10);
+    const limit = !isNaN(limitQuery) && limitQuery > 0 ? Math.min(limitQuery, 100) : 20;
+    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor.trim() : undefined;
+
+    // Validate platform enum if provided
+    const validPlatforms = ['CHATGPT', 'CLAUDE', 'GEMINI', 'DEEPSEEK', 'PERPLEXITY', 'GROK', 'GENERIC'];
+    const platform = platformQuery && validPlatforms.includes(platformQuery)
+      ? (platformQuery as Platform)
+      : undefined;
+
+    // Build Prisma where conditions
+    const whereConditions: any[] = [];
+
+    if (platform) {
+      whereConditions.push({ platform });
+    }
+
+    if (q) {
+      whereConditions.push({
+        OR: [
+          { title: { contains: q, mode: 'insensitive' } },
+          {
+            captures: {
+              some: {
+                messages: {
+                  some: {
+                    textPlain: { contains: q, mode: 'insensitive' },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      });
+    }
+
+    // Handle cursor pagination
+    if (cursor) {
+      const cursorChat = await prisma.chat.findUnique({
+        where: { id: cursor },
+        select: { id: true, updatedAt: true },
+      });
+
+      if (cursorChat) {
+        whereConditions.push({
+          OR: [
+            { updatedAt: { lt: cursorChat.updatedAt } },
+            {
+              updatedAt: cursorChat.updatedAt,
+              id: { lt: cursorChat.id },
+            },
+          ],
+        });
+      }
+    }
+
+    const where = whereConditions.length > 0 ? { AND: whereConditions } : {};
+
+    // Fetch limit + 1 items to determine if a next cursor exists
+    const chats = await prisma.chat.findMany({
+      where,
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      include: {
+        captures: {
+          orderBy: { version: 'desc' },
+          take: 1,
+          include: {
+            outputs: {
+              where: { kind: 'SUMMARY' },
+              select: { id: true },
+            },
+          },
+        },
+      },
+    });
+
+    const hasMore = chats.length > limit;
+    const pageChats = hasMore ? chats.slice(0, limit) : chats;
+    const nextCursor = hasMore ? pageChats[pageChats.length - 1].id : null;
+
+    const items = pageChats
+      .filter((chat) => chat.captures.length > 0)
+      .map((chat) => {
+        const latestCapture = chat.captures[0];
+        const stats = (latestCapture.stats as any) || {};
+
+        return {
+          chatId: chat.id,
+          captureId: latestCapture.id,
+          title: chat.title,
+          platform: chat.platform,
+          version: latestCapture.version,
+          status: latestCapture.status,
+          messageCount: stats.messageCount ?? 0,
+          tokenEstimate: stats.tokenEstimate ?? 0,
+          hasSummary: latestCapture.outputs.length > 0,
+          updatedAt: chat.updatedAt.toISOString(),
+        };
+      });
+
+    return res.status(200).json({
+      items,
+      nextCursor,
+    });
+  } catch (error) {
+    console.error('❌ Failed to list captures:', error);
+    return res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to retrieve capture library.',
+      },
+    });
+  }
+});
+
+// ============================================================================
+// GET /api/captures/:id — Capture Overview & Fidelity Stats
+//
+// URL parameters:
+//   - id (UUID): Capture ID
+// ============================================================================
+router.get('/api/captures/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const capture = await prisma.capture.findUnique({
+      where: { id },
+      include: {
+        chat: {
+          include: {
+            captures: {
+              select: {
+                id: true,
+                version: true,
+                createdAt: true,
+              },
+              orderBy: { version: 'desc' },
+            },
+          },
+        },
+        outputs: {
+          select: {
+            id: true,
+            kind: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+        assets: {
+          select: {
+            id: true,
+            mime: true,
+            localPath: true,
+          },
+          orderBy: { messageIdx: 'asc' },
+        },
+      },
+    });
+
+    if (!capture) {
+      return res.status(404).json({
+        error: {
+          code: 'CAPTURE_NOT_FOUND',
+          message: `Capture with ID "${id}" was not found.`,
+        },
+      });
+    }
+
+    const rawStats = (capture.stats as any) || {};
+    const stats = {
+      messageCount: rawStats.messageCount ?? 0,
+      codeBlockCount: rawStats.codeBlockCount ?? 0,
+      tokenEstimate: rawStats.tokenEstimate ?? 0,
+    };
+
+    const versions = capture.chat.captures.map((c) => ({
+      captureId: c.id,
+      version: c.version,
+      createdAt: c.createdAt.toISOString(),
+    }));
+
+    return res.status(200).json({
+      id: capture.id,
+      chatId: capture.chatId,
+      title: capture.chat.title,
+      platform: capture.chat.platform,
+      sourceUrl: capture.chat.sourceUrl,
+      version: capture.version,
+      status: capture.status,
+      stats,
+      versions,
+      outputs: capture.outputs.map((o) => ({
+        id: o.id,
+        kind: o.kind,
+        createdAt: o.createdAt.toISOString(),
+      })),
+      assets: capture.assets.map((a) => ({
+        id: a.id,
+        mime: a.mime,
+        localPath: a.localPath,
+      })),
+    });
+  } catch (error) {
+    console.error(`❌ Failed to retrieve capture "${req.params.id}":`, error);
+    return res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to retrieve capture overview.',
+      },
+    });
+  }
+});
+
+// ============================================================================
+// GET /api/captures/:id/messages — Structured Transcript (Messages & Blocks)
+//
+// URL parameters:
+//   - id (UUID): Capture ID
+// Query parameters:
+//   - role (enum, optional): Filter by USER or ASSISTANT
+// ============================================================================
+router.get('/api/captures/:id/messages', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const roleQuery = typeof req.query.role === 'string' ? req.query.role.toUpperCase() : undefined;
+
+    // Check if capture exists
+    const capture = await prisma.capture.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!capture) {
+      return res.status(404).json({
+        error: {
+          code: 'CAPTURE_NOT_FOUND',
+          message: `Capture with ID "${id}" was not found.`,
+        },
+      });
+    }
+
+    const where: any = { captureId: id };
+    if (roleQuery && ['USER', 'ASSISTANT', 'SYSTEM'].includes(roleQuery)) {
+      where.role = roleQuery;
+    }
+
+    const messages = await prisma.message.findMany({
+      where,
+      orderBy: { idx: 'asc' },
+    });
+
+    const items = messages.map((m) => ({
+      id: m.id,
+      idx: m.idx,
+      role: m.role,
+      textPlain: m.textPlain,
+      blocks: m.blocks,
+      tokenEstimate: m.tokenEstimate,
+    }));
+
+    return res.status(200).json({ items });
+  } catch (error) {
+    console.error(`❌ Failed to retrieve messages for capture "${req.params.id}":`, error);
+    return res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to retrieve messages transcript.',
+      },
+    });
+  }
+});
+
+// ============================================================================
 // Helper: Extract message index from asset filename
 // ============================================================================
 function extractMessageIdxFromFilename(filename: string): number {

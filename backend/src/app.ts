@@ -2,6 +2,8 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { healthRouter } from './routes/health';
 import { capturesRouter } from './routes/captures';
+import { outputsRouter } from './routes/outputs';
+import { assetsRouter } from './routes/assets';
 
 export function createApp() {
   const app = express();
@@ -13,6 +15,8 @@ export function createApp() {
   // Mount routes
   app.use(healthRouter);
   app.use(capturesRouter);
+  app.use(outputsRouter);
+  app.use(assetsRouter);
 
   // Catch-all 404 handler
   app.use((_req: Request, res: Response) => {
