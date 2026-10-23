@@ -29,7 +29,7 @@ export function App() {
   return (
     <div className="shell">
       <header className="header">
-        <div className="brand"><Logo /><span className="brand-name">ContextPort</span></div>
+        <div className="brand"><Logo /><span className="brand-name">Loom</span></div>
         <span className={`pill ${t.connection.status}`} title={`Server: ${CONN_LABEL[t.connection.status]}`}>
           <i className="dot" />{CONN_LABEL[t.connection.status]}
         </span>

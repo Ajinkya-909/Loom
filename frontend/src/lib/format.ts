@@ -1,14 +1,17 @@
-export function formatTokens(n: number): string {
+export function formatTokens(n?: number): string {
+  if (typeof n !== "number" || isNaN(n) || n <= 0) return "0 tokens";
   if (n >= 1000) return `~${(n / 1000).toFixed(1)}k tokens`;
   return `~${n} tokens`;
 }
 
-export function formatNumber(n: number): string {
+export function formatNumber(n?: number): string {
+  if (typeof n !== "number" || isNaN(n) || n <= 0) return "0";
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return String(n);
 }
 
-export function formatBytes(n: number): string {
+export function formatBytes(n?: number): string {
+  if (typeof n !== "number" || isNaN(n) || n <= 0) return "";
   if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
   if (n >= 1024) return `${Math.round(n / 1024)} KB`;
   return `${n} B`;
@@ -49,3 +52,9 @@ export function slugify(title: string): string {
       .slice(0, 60) || "capture"
   );
 }
+
+export const exportFilenames = {
+  context: (d: { title: string; version: number }) => `${slugify(d.title)}-v${d.version}-context.md`,
+  summary: (d: { title: string; version: number }) => `${slugify(d.title)}-v${d.version}-summary.md`,
+  zip: (d: { title: string; version: number }) => `loom-export-${slugify(d.title)}-v${d.version}.zip`,
+};

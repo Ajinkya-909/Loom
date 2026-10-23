@@ -6,7 +6,6 @@ import { CaptureWorkspace } from "@/components/CaptureWorkspace";
 import { RightPane, PaneOverlay } from "@/components/RightPane";
 import { useLoom } from "@/lib/store";
 import * as api from "@/lib/api";
-import * as mock from "@/lib/mock";
 import type { CaptureDetail, Message, Output } from "@/lib/types";
 
 type Tab = "summary" | "context";
@@ -62,7 +61,7 @@ function CapturePage() {
   const search = Route.useSearch();
   const tab: Tab = search["tab"] ?? "summary";
   const navigate = Route.useNavigate();
-  const { settings, generation, startGeneration, reloadCaptures } = useLoom();
+  const { settings, generation, startGeneration, trackJob, reloadCaptures } = useLoom();
 
   const [detail, setDetail] = useState<CaptureDetail | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -82,8 +81,7 @@ function CapturePage() {
     setDetail(null);
     setOutput(null);
     void (async () => {
-      let d = settings.mockMode ? null : await api.capture(settings, id);
-      if (!d) d = mock.getCapture(id);
+      const d = await api.capture(settings, id);
       if (!d) {
         if (alive) {
           setNotFound(true);
@@ -109,17 +107,32 @@ function CapturePage() {
       setDetail(norm);
       setVersion(norm.version);
 
-      let msgs = settings.mockMode ? null : ((await api.messages(settings, id, norm.version))?.items ?? null);
-      if (!msgs) msgs = mock.getMessages(id, norm.version);
-      let out = settings.mockMode ? null : await api.output(settings, id);
-      if (!out) out = mock.getOutput(id);
+      const msgs = (await api.messages(settings, id, norm.version))?.items ?? [];
+      const out = await api.output(settings, id);
       if (!alive) return;
       setMessages(msgs);
       setOutput(out);
       setLoading(false);
 
-      // Default tab per spec: summary when one exists, otherwise context.
-      if (!norm.hasSummary && generationRef.current[id]?.status !== "RUNNING") {
+      // If capture has an active background job (e.g. from extension "Get & Summarize"), track it live!
+      if (d.activeJob && d.activeJob.status === "RUNNING") {
+        trackJob(
+          id,
+          d.activeJob.id,
+          {
+            onDone: () => {
+              reloadCaptures();
+              void loadOutput();
+            },
+          },
+          d.activeJob.stage,
+          d.activeJob.progress,
+        );
+      }
+
+      // Default tab per spec: summary when one exists or is actively generating, otherwise context
+      const isJobRunning = d.activeJob?.status === "RUNNING" || generationRef.current[id]?.status === "RUNNING";
+      if (!norm.hasSummary && !isJobRunning && search["tab"] !== "summary") {
         void navigate({
           to: "/c/$id",
           params: { id },
@@ -136,14 +149,12 @@ function CapturePage() {
 
   const changeVersion = async (v: number) => {
     setVersion(v);
-    let msgs = settings.mockMode ? null : ((await api.messages(settings, id, v))?.items ?? null);
-    if (!msgs) msgs = mock.getMessages(id, v);
+    const msgs = (await api.messages(settings, id, v))?.items ?? [];
     setMessages(msgs);
   };
 
   const loadOutput = async () => {
-    let out = settings.mockMode ? null : await api.output(settings, id);
-    if (!out) out = mock.getOutput(id);
+    const out = await api.output(settings, id);
     setOutput(out);
     setDetail((d) => (d ? { ...d, hasSummary: !!out } : d));
   };

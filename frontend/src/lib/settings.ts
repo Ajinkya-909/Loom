@@ -3,7 +3,6 @@ export type Theme = "light" | "dark" | "system";
 export interface LoomSettings {
   apiUrl: string;
   token: string;
-  mockMode: boolean;
 }
 
 export const DEFAULT_API_URL = "http://localhost:4000";
@@ -13,7 +12,7 @@ const THEME_KEY = "loom.theme";
 const envApiUrl = (import.meta.env["VITE_API_URL"] as string | undefined) ?? DEFAULT_API_URL;
 
 export function defaultSettings(): LoomSettings {
-  return { apiUrl: envApiUrl, token: "", mockMode: false };
+  return { apiUrl: envApiUrl, token: "" };
 }
 
 export function loadSettings(): LoomSettings {
@@ -25,7 +24,6 @@ export function loadSettings(): LoomSettings {
     return {
       apiUrl: typeof parsed.apiUrl === "string" && parsed.apiUrl ? parsed.apiUrl : base.apiUrl,
       token: typeof parsed.token === "string" ? parsed.token : "",
-      mockMode: typeof parsed.mockMode === "boolean" ? parsed.mockMode : base.mockMode,
     };
   } catch {
     return base;

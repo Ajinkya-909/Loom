@@ -31,4 +31,4 @@ export const KEEPALIVE_MS = 20_000;
 export const SUCCESS_BADGE_MS = 5_000;
 export const TITLE_FALLBACK_CHARS = 60;
 export const DEFAULT_SERVER_URL = 'http://localhost:4000';
-export const DEFAULT_WEB_URL = 'http://localhost:4000'; // the mock server serves /c/:id itself
+export const DEFAULT_WEB_URL = 'http://localhost:8080';

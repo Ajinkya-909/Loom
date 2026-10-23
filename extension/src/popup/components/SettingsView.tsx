@@ -49,7 +49,7 @@ export function SettingsView({ initial, onBack }: Props) {
       </label>
       <label className="field">
         <span>Web app URL</span>
-        <input value={form.webUrl} onChange={(e) => set('webUrl', e.target.value)} placeholder="http://localhost:3000" spellCheck={false} inputMode="url" />
+        <input value={form.webUrl} onChange={(e) => set('webUrl', e.target.value)} placeholder="http://localhost:8080" spellCheck={false} inputMode="url" />
       </label>
       <label className="field">
         <span>API token (optional)</span>

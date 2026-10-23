@@ -2,9 +2,6 @@
 /**
  * Typed client for the Loom companion server (default http://localhost:4000,
  * configurable via VITE_API_URL or the in-app Settings modal).
- *
- * Every call resolves to `null` on any failure (offline, non-2xx, timeout)
- * so callers can transparently fall back to the built-in mock dataset.
  */
 import type {
   CaptureDetail,
@@ -132,7 +129,8 @@ export function subscribeJob(
 ): () => void {
   const url = `${s.apiUrl}/api/jobs/${jobId}/events${s.token ? `?token=${encodeURIComponent(s.token)}` : ""}`;
   const es = new EventSource(url);
-  es.onmessage = (msg) => {
+
+  const handleMessage = (msg: MessageEvent) => {
     let ev: JobSseEvent = {};
     try {
       ev = JSON.parse(msg.data) as JobSseEvent;
@@ -140,13 +138,23 @@ export function subscribeJob(
       return;
     }
     onEvent(ev);
-    const status = ev.status ?? ev.stage;
-    if (status === "completed" || status === "failed" || status === "COMPLETED" || status === "FAILED") {
+    const status = (ev.status ?? ev.stage ?? "").toUpperCase();
+    if (status === "COMPLETED" || status === "FAILED") {
       es.close();
     }
   };
-  es.onerror = () => {
-    es.close();
-  };
+
+  es.addEventListener("stage", handleMessage);
+  es.addEventListener("done", handleMessage);
+  es.addEventListener("error", (e: any) => {
+    // If e is a MessageEvent with data, handle it
+    if (e?.data) {
+      handleMessage(e);
+    } else {
+      es.close();
+    }
+  });
+  es.onmessage = handleMessage;
+
   return () => es.close();
 }

@@ -15,15 +15,28 @@ export async function getOutputController(req: Request, res: Response) {
     const { id } = req.params;
     const format = typeof req.query.format === 'string' ? req.query.format.toLowerCase() : 'json';
 
-    const output = await prisma.output.findUnique({
+    let output = await prisma.output.findUnique({
       where: { id },
     });
+
+    if (!output) {
+      // Fallback: check if id is a captureId (frontend queries /api/outputs/:captureId?kind=SUMMARY)
+      const kindQuery = typeof req.query.kind === 'string' ? req.query.kind.toUpperCase() : undefined;
+      const validKind = kindQuery === 'CONTEXT' ? 'CONTEXT' : 'SUMMARY';
+      output = await prisma.output.findFirst({
+        where: {
+          captureId: id,
+          kind: validKind,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
 
     if (!output) {
       return res.status(404).json({
         error: {
           code: 'OUTPUT_NOT_FOUND',
-          message: `Output deliverable with ID "${id}" was not found.`,
+          message: `Output deliverable for ID "${id}" was not found.`,
         },
       });
     }

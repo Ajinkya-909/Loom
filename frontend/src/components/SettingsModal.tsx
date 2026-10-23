@@ -104,18 +104,6 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             />
           </label>
 
-          <label className="flex cursor-pointer items-center gap-2.5">
-            <input
-              type="checkbox"
-              checked={draft.mockMode}
-              onChange={(e) => setDraft((d) => ({ ...d, mockMode: e.target.checked }))}
-              className="h-4 w-4 accent-[var(--accent)]"
-            />
-            <span className="text-sm">
-              Use built-in mock data
-              <span className="ml-1 text-xs text-muted-foreground">— explore the full UI offline</span>
-            </span>
-          </label>
 
           {notice && (
             <p

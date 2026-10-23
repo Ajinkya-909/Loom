@@ -12,8 +12,6 @@ function pillTone(state: ConnState, authorized: boolean | undefined): string {
       return "bg-success-soft text-success";
     case "offline":
       return "bg-error-soft text-error";
-    case "mock":
-      return "bg-warn-soft text-warn";
     default:
       return "bg-secondary text-muted-foreground";
   }
@@ -26,8 +24,6 @@ function pillLabel(state: ConnState, authorized: boolean | undefined): string {
       return "Connected";
     case "offline":
       return "Offline";
-    case "mock":
-      return "Mock data";
     default:
       return "Checking";
   }
@@ -65,18 +61,14 @@ export function Header() {
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card/60 px-4">
       {/* Brand */}
       <div className="flex min-w-0 items-center gap-2.5">
-        <svg
-          viewBox="0 0 32 32"
-          className="h-7 w-7 shrink-0"
-          aria-hidden="true"
-        >
-          <rect width="32" height="32" rx="8" fill="var(--color-primary, #c6613f)" />
-          <circle cx="16" cy="16" r="8.4" fill="none" stroke="var(--color-primary-foreground, #fffaf5)" strokeWidth="2.6" />
-          <circle cx="16" cy="16" r="3" fill="var(--color-primary-foreground, #fffaf5)" />
-        </svg>
+        <img
+          src="/icon48.png"
+          alt="Loom logo"
+          className="h-7 w-7 rounded-lg shrink-0 object-contain shadow-xs"
+        />
         <span className="font-serif text-lg font-semibold leading-none tracking-tight">Loom</span>
         <span className="hidden text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:inline">
-          ContextPort
+          AI Workspace
         </span>
       </div>
 

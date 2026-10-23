@@ -1,4 +1,12 @@
-export type Platform = "chatgpt" | "claude" | "gemini" | "deepseek" | "perplexity";
+export type Platform =
+  | "chatgpt"
+  | "claude"
+  | "gemini"
+  | "deepseek"
+  | "perplexity"
+  | "grok"
+  | "generic"
+  | string;
 
 export type CaptureStatus = "READY" | "RUNNING" | "FAILED";
 
@@ -37,7 +45,7 @@ export interface Asset {
   id: string;
   name: string;
   mime: string;
-  size: number;
+  size?: number;
   url: string;
 }
 
@@ -67,6 +75,13 @@ export interface CaptureDetail {
   versions: CaptureVersion[];
   hasSummary: boolean;
   assets: Asset[];
+  activeJob?: {
+    id: string;
+    type: string;
+    stage: string;
+    status: string;
+    progress: number;
+  } | null;
 }
 
 export interface Output {

@@ -39,7 +39,7 @@ export function Lightbox({ asset, onClose }: LightboxProps) {
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{asset.name}</p>
             <p className="text-xs text-muted-foreground">
-              {formatBytes(asset.size)} · {asset.mime}
+              {asset.size ? `${formatBytes(asset.size)} · ` : ""}{asset.mime}
             </p>
           </div>
           <a

@@ -8,7 +8,7 @@ import { platformFromUrl } from '../shared/platforms';
 import type {
   CaptureResponse, ContentCommand, ContentEvent, FetchAssetResponse, OpenResponse, ProbeResponse, TestConnectionResponse,
 } from '../shared/protocol';
-import { getSettings, isLocalUrl, joinWebUrl, originPattern } from '../shared/settings';
+import { getSettings, isLocalUrl, originPattern } from '../shared/settings';
 import { isResultState, isRunning, reduce, type StateEvent } from '../shared/stateMachine';
 import type { Action, CaptureMeta, ConnectionInfo, CoreMeta, RunState, Settings, Warning } from '../shared/types';
 import { getConfig, postCapture } from './apiClient';
@@ -247,17 +247,30 @@ async function execute(run: LiveRun): Promise<void> {
   live.delete(tabId);
   cleanup(run);
 
+  const tabParam = run.action === 'summarize' ? 'tab=summary' : 'tab=context';
+  const baseViewerUrl = result.data.viewerUrl;
+  const viewerUrl = baseViewerUrl.includes('?') ? `${baseViewerUrl}&${tabParam}` : `${baseViewerUrl}?${tabParam}`;
+
   if (result.kind === 'duplicate') {
-    await commit(tabId, { type: 'DUPLICATE', runId, ...pick(result.data) });
+    await commit(tabId, {
+      type: 'DUPLICATE',
+      runId,
+      captureId: result.data.captureId,
+      version: result.data.version,
+      viewerUrl,
+    });
     return;
   }
-  await commit(tabId, { type: 'ACCEPTED', runId, ...pick(result.data), warnings: clientWarnings });
-  if (settings.openViewerAfterUpload) {
-    void chrome.tabs.create({ url: joinWebUrl(settings.webUrl, result.data.viewerUrl) });
-  }
-}
 
-const pick = (d: { captureId: string; version: number; viewerUrl: string }) => ({ captureId: d.captureId, version: d.version, viewerUrl: d.viewerUrl });
+  await commit(tabId, {
+    type: 'ACCEPTED',
+    runId,
+    captureId: result.data.captureId,
+    version: result.data.version,
+    viewerUrl,
+    warnings: clientWarnings,
+  });
+}
 
 async function failRun(run: LiveRun, err: unknown): Promise<void> {
   const ce = err instanceof CaptureError ? err : new CaptureError('UNKNOWN', undefined, err instanceof Error ? err.message : undefined);

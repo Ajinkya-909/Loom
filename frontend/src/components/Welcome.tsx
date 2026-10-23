@@ -33,7 +33,7 @@ export function WelcomeCenter({ onOpenSide }: { onOpenSide: () => void }) {
       <div>
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
-            ContextPort Workspace
+            Loom Workspace
           </p>
           <button
             type="button"
@@ -97,7 +97,7 @@ export function HomeRight() {
         <dl className="mt-3 space-y-2 text-sm">
           <div className="flex justify-between gap-2">
             <dt className="text-muted-foreground">Status</dt>
-            <dd className="font-medium capitalize">{conn.state === "mock" ? "mock data" : conn.state}</dd>
+            <dd className="font-medium capitalize">{conn.state}</dd>
           </div>
           {conn.config && (
             <>

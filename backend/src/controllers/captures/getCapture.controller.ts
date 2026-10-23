@@ -68,9 +68,15 @@ export async function getCaptureController(req: Request, res: Response) {
 
     const rawStats = (capture.stats as any) || {};
     const stats = {
+      tokens: rawStats.tokenEstimate ?? 0,
+      messages: rawStats.messageCount ?? 0,
+      codeBlocks: rawStats.codeBlockCount ?? 0,
+      tables: rawStats.tableCount ?? 0,
+      assets: capture.assets.length || (rawStats.assetCount ?? 0),
+      tokenEstimate: rawStats.tokenEstimate ?? 0,
       messageCount: rawStats.messageCount ?? 0,
       codeBlockCount: rawStats.codeBlockCount ?? 0,
-      tokenEstimate: rawStats.tokenEstimate ?? 0,
+      tableCount: rawStats.tableCount ?? 0,
     };
 
     const versions = capture.chat.captures.map((c) => ({
@@ -81,12 +87,15 @@ export async function getCaptureController(req: Request, res: Response) {
 
     return res.status(200).json({
       id: capture.id,
+      captureId: capture.id,
       chatId: capture.chatId,
       title: capture.chat.title,
-      platform: capture.chat.platform,
+      platform: capture.chat.platform.toLowerCase(),
       sourceUrl: capture.chat.sourceUrl,
       version: capture.version,
       status: capture.status,
+      capturedAt: capture.createdAt.toISOString(),
+      hasSummary: capture.outputs.some((o) => o.kind === 'SUMMARY'),
       stats,
       versions,
       outputs: capture.outputs.map((o) => ({
@@ -94,12 +103,25 @@ export async function getCaptureController(req: Request, res: Response) {
         kind: o.kind,
         createdAt: o.createdAt.toISOString(),
       })),
-      assets: capture.assets.map((a) => ({
-        id: a.id,
-        mime: a.mime,
-        localPath: a.localPath,
-      })),
-      activeJob: capture.jobs[0] || null,
+      assets: capture.assets.map((a) => {
+        const name = a.localPath ? a.localPath.split(/[/\\]/).pop() || 'asset.bin' : 'asset.bin';
+        return {
+          id: a.id,
+          name,
+          mime: a.mime,
+          url: `/api/assets/${a.id}`,
+          localPath: a.localPath,
+        };
+      }),
+      activeJob: capture.jobs[0]
+        ? {
+            id: capture.jobs[0].id,
+            type: capture.jobs[0].type,
+            stage: capture.jobs[0].stage,
+            status: capture.jobs[0].status,
+            progress: Math.round((capture.jobs[0].progress ?? 0) * 100),
+          }
+        : null,
     });
   } catch (error) {
     console.error(`❌ Failed to retrieve capture "${req.params.id}":`, error);

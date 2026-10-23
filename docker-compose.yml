@@ -1,6 +1,9 @@
 name: loom
 
 services:
+  # ---------------------------------------------------------------------------
+  # 1. PostgreSQL Database Service
+  # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
     container_name: loom-postgres
@@ -19,6 +22,9 @@ services:
       timeout: 3s
       retries: 5
 
+  # ---------------------------------------------------------------------------
+  # 2. Loom Backend API & Ingestion Pipeline
+  # ---------------------------------------------------------------------------
   backend:
     build:
       context: ./backend
@@ -29,6 +35,10 @@ services:
       NODE_ENV: production
       PORT: ${BACKEND_PORT:-4000}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-loom_db}?schema=public
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma:2b}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     volumes:
@@ -37,6 +47,52 @@ services:
       postgres:
         condition: service_healthy
 
+  # ---------------------------------------------------------------------------
+  # 3. Loom Web Frontend (Vite / TanStack Start Workspace)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: loom-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: ${FRONTEND_PORT:-8080}
+      NITRO_PORT: ${FRONTEND_PORT:-8080}
+      VITE_API_URL: http://localhost:${BACKEND_PORT:-4000}
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+    depends_on:
+      - backend
+
+  # ---------------------------------------------------------------------------
+  # 4. Local Gemma 4 / Gemma Model Server (Ollama)
+  # [CURRENTLY COMMENTED OUT to save memory/disk on low-end machines]
+  # When commented out, backend automatically falls back to GEMINI_API_KEY.
+  # To enable: uncomment this service and the 'ollama_data' volume below.
+  # ---------------------------------------------------------------------------
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: loom-ollama
+  #   restart: unless-stopped
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   environment:
+  #     - OLLAMA_KEEP_ALIVE=24h
+  #   entrypoint: ["/bin/sh", "-c"]
+  #   command:
+  #     - |
+  #       ollama serve &
+  #       sleep 5
+  #       echo "Pulling Gemma model..."
+  #       ollama pull gemma:2b
+  #       wait
+
 volumes:
   postgres_data:
     name: loom_postgres_data
+  # ollama_data:
+  #   name: loom_ollama_data

@@ -106,7 +106,7 @@ export async function listCapturesController(req: Request, res: Response) {
           chatId: chat.id,
           captureId: latestCapture.id,
           title: chat.title,
-          platform: chat.platform,
+          platform: chat.platform.toLowerCase(),
           version: latestCapture.version,
           status: latestCapture.status,
           messageCount: stats.messageCount ?? 0,

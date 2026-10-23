@@ -1,13 +1,13 @@
 import { useEffect, useRef } from "react";
 import { Link, useParams } from "@tanstack/react-router";
-import { Loader2, Search, X } from "lucide-react";
+import { Loader2, MessagesSquare, Search, X } from "lucide-react";
 import { useLoom } from "@/lib/store";
-import { PLATFORMS, PLATFORM_ORDER, type PlatformMeta } from "@/lib/platforms";
+import { PLATFORM_ORDER, getPlatformMeta, type PlatformMeta } from "@/lib/platforms";
 import { formatNumber, timeAgo } from "@/lib/format";
 import type { CaptureListItem, Platform } from "@/lib/types";
 
 function PlatformChip({ platform }: { platform: Platform }) {
-  const meta: PlatformMeta = PLATFORMS[platform];
+  const meta: PlatformMeta = getPlatformMeta(platform);
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
@@ -70,7 +70,7 @@ export function LeftPane() {
 
   const filters: { value: "all" | Platform; label: string }[] = [
     { value: "all", label: "All" },
-    ...PLATFORM_ORDER.map((p) => ({ value: p as "all" | Platform, label: PLATFORMS[p].label })),
+    ...PLATFORM_ORDER.map((p) => ({ value: p as "all" | Platform, label: getPlatformMeta(p).label })),
   ];
 
   return (
@@ -125,9 +125,21 @@ export function LeftPane() {
             <Loader2 className="h-5 w-5 loom-spin" />
           </div>
         ) : captures.length === 0 ? (
-          <p className="px-3 py-10 text-center text-sm text-muted-foreground">
-            No captures match{query ? ` “${query}”` : " this filter"}.
-          </p>
+          <div className="px-4 py-12 text-center text-sm text-muted-foreground">
+            {query || platform !== "all" ? (
+              <p>No captures match{query ? ` “${query}”` : " this filter"}.</p>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-secondary text-muted-foreground">
+                  <MessagesSquare className="h-4 w-4" />
+                </span>
+                <p className="font-medium text-foreground">No chats captured yet</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Use the Loom extension on ChatGPT, Claude, Gemini, etc. to save your first conversation.
+                </p>
+              </div>
+            )}
+          </div>
         ) : (
           captures.map((c) => <CaptureCard key={c.captureId} capture={c} active={c.captureId === params.id} />)
         )}

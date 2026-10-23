@@ -1,24 +1,21 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { X } from "lucide-react";
 import {
-  Code2,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
   FileText,
-  Images,
+  Layers,
   Loader2,
   MessagesSquare,
   Package,
   Sparkles,
-  Table2,
+  X,
 } from "lucide-react";
 import { useLoom } from "@/lib/store";
 import * as api from "@/lib/api";
-import {
-  buildContextMarkdown,
-  buildSummaryMarkdown,
-  buildZipBundle,
-  mockFilenames,
-} from "@/lib/mock";
-import { formatBytes, formatTokens } from "@/lib/format";
+import { formatBytes, formatDateTime, formatTokens, timeAgo, exportFilenames } from "@/lib/format";
+import { getPlatformMeta } from "@/lib/platforms";
 import type { CaptureDetail, Message, Output } from "@/lib/types";
 import { Lightbox } from "./Lightbox";
 
@@ -28,51 +25,52 @@ interface RightPaneProps {
   output: Output | null;
 }
 
-function StatRow({ icon: Icon, label, value }: { icon: typeof Code2; label: string; value: string }) {
+function InfoRow({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: typeof FileText;
+  label: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="inline-flex items-center gap-2 text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
+    <div className="flex items-center justify-between gap-2 py-0.5">
+      <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+        <Icon className="h-3.5 w-3.5 shrink-0" />
         {label}
       </span>
-      <span className="font-medium">{value}</span>
+      <div className="text-right text-xs font-medium">{children}</div>
     </div>
   );
 }
 
 export function RightPane({ detail, messages, output }: RightPaneProps) {
-  const { settings } = useLoom();
+  const { settings, generation } = useLoom();
   const [busy, setBusy] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<CaptureDetail["assets"][number] | null>(null);
+
+  const activeJob = generation[detail.captureId];
+  const isGenerating = activeJob?.status === "RUNNING";
+  const hasSummary = Boolean(output || detail.hasSummary || activeJob?.status === "COMPLETED");
+  const platformMeta = getPlatformMeta(detail.platform);
+  const messageCount = detail.stats?.messages || messages.length || 0;
+  const tokenEstimate = detail.stats?.tokens || 0;
 
   const downloadContext = async () => {
     setBusy("context");
     try {
-      if (!settings.mockMode) {
-        const ok = await api.downloadExport(settings, detail.captureId, "context", mockFilenames.context(detail));
-        if (ok) return;
-      }
-      api.triggerDownload(
-        new Blob([buildContextMarkdown(detail, messages)], { type: "text/markdown" }),
-        mockFilenames.context(detail),
-      );
+      await api.downloadExport(settings, detail.captureId, "context", exportFilenames.context(detail));
     } finally {
       setBusy(null);
     }
   };
 
   const downloadSummary = async () => {
-    if (!output) return;
+    if (!hasSummary) return;
     setBusy("summary");
     try {
-      if (!settings.mockMode) {
-        const ok = await api.downloadExport(settings, detail.captureId, "summary", mockFilenames.summary(detail));
-        if (ok) return;
-      }
-      api.triggerDownload(
-        new Blob([buildSummaryMarkdown(output)], { type: "text/markdown" }),
-        mockFilenames.summary(detail),
-      );
+      await api.downloadExport(settings, detail.captureId, "summary", exportFilenames.summary(detail));
     } finally {
       setBusy(null);
     }
@@ -81,12 +79,7 @@ export function RightPane({ detail, messages, output }: RightPaneProps) {
   const downloadZip = async () => {
     setBusy("zip");
     try {
-      if (!settings.mockMode) {
-        const ok = await api.downloadExport(settings, detail.captureId, "zip", mockFilenames.zip(detail));
-        if (ok) return;
-      }
-      const blob = await buildZipBundle(detail, messages, output);
-      api.triggerDownload(blob, mockFilenames.zip(detail));
+      await api.downloadExport(settings, detail.captureId, "zip", exportFilenames.zip(detail));
     } finally {
       setBusy(null);
     }
@@ -94,15 +87,97 @@ export function RightPane({ detail, messages, output }: RightPaneProps) {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      {/* Fidelity & stats */}
+      {/* Capture Overview */}
       <section className="rounded-2xl border border-border bg-card p-4">
-        <h2 className="font-serif text-[15px] font-semibold">Session fidelity</h2>
-        <div className="mt-3 space-y-2 text-sm">
-          <StatRow icon={FileText} label="Tokens" value={formatTokens(detail.stats.tokens)} />
-          <StatRow icon={MessagesSquare} label="Messages" value={String(detail.stats.messages)} />
-          <StatRow icon={Code2} label="Code blocks" value={String(detail.stats.codeBlocks)} />
-          <StatRow icon={Table2} label="Tables preserved" value={String(detail.stats.tables)} />
-          <StatRow icon={Images} label="Rescued assets" value={String(detail.stats.assets)} />
+        <h2 className="font-serif text-[15px] font-semibold">Capture overview</h2>
+        <div className="mt-3 divide-y divide-border/50 text-sm">
+          <div className="pb-2">
+            <InfoRow icon={Sparkles} label="Platform">
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                style={{ color: platformMeta.color, backgroundColor: platformMeta.softBg }}
+              >
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: platformMeta.color }} />
+                {platformMeta.label}
+              </span>
+            </InfoRow>
+          </div>
+
+          <div className="py-2">
+            <InfoRow icon={Layers} label="Version">
+              <span className="rounded border border-border bg-secondary/50 px-1.5 py-0.5 font-mono text-[11px]">
+                v{detail.version}
+              </span>
+            </InfoRow>
+          </div>
+
+          <div className="py-2">
+            <InfoRow icon={Calendar} label="Captured">
+              <span title={formatDateTime(detail.capturedAt)}>
+                {timeAgo(detail.capturedAt)}
+              </span>
+            </InfoRow>
+          </div>
+
+          <div className="py-2">
+            <InfoRow icon={MessagesSquare} label="Messages">
+              <span>{messageCount} msgs</span>
+            </InfoRow>
+          </div>
+
+          <div className="py-2">
+            <InfoRow icon={FileText} label="Tokens">
+              <span>{formatTokens(tokenEstimate)}</span>
+            </InfoRow>
+          </div>
+
+          <div className="pt-2">
+            <InfoRow icon={ExternalLink} label="Source">
+              <a
+                href={detail.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+                title={detail.sourceUrl}
+              >
+                Original chat
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </InfoRow>
+          </div>
+        </div>
+
+        {/* Deliverables readiness indicator */}
+        <div className="mt-3 rounded-xl border border-border bg-secondary/30 p-2.5 text-xs">
+          <span className="font-medium text-muted-foreground">Deliverables:</span>
+          <div className="mt-1.5 flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 text-foreground">
+              <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span>context.md</span>
+              <span className="ml-auto text-[10px] text-muted-foreground">Lossless</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-foreground">
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 loom-spin text-primary shrink-0" />
+                  <span className="text-primary font-medium">summary.md</span>
+                  <span className="ml-auto text-[10px] text-primary">Generating…</span>
+                </>
+              ) : hasSummary ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span>summary.md</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground">Distilled</span>
+                </>
+              ) : (
+                <>
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">summary.md</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground">Available</span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -122,8 +197,8 @@ export function RightPane({ detail, messages, output }: RightPaneProps) {
           <button
             type="button"
             onClick={downloadSummary}
-            disabled={!output || busy !== null}
-            title={output ? undefined : "Generate the distilled summary first"}
+            disabled={!hasSummary || busy !== null}
+            title={hasSummary ? undefined : "Generate the distilled summary first"}
             className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-medium transition-colors hover:border-primary disabled:cursor-not-allowed disabled:opacity-45"
           >
             {busy === "summary" ? <Loader2 className="h-3.5 w-3.5 loom-spin" /> : <FileText className="h-3.5 w-3.5" />}
@@ -146,7 +221,14 @@ export function RightPane({ detail, messages, output }: RightPaneProps) {
 
       {/* Rescued media */}
       <section className="rounded-2xl border border-border bg-card p-4">
-        <h2 className="font-serif text-[15px] font-semibold">Rescued media</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-[15px] font-semibold">Rescued media</h2>
+          {detail.assets.length > 0 && (
+            <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {detail.assets.length}
+            </span>
+          )}
+        </div>
         {detail.assets.length === 0 ? (
           <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5" />
@@ -160,7 +242,7 @@ export function RightPane({ detail, messages, output }: RightPaneProps) {
                 type="button"
                 onClick={() => setLightbox(a)}
                 className="group text-left"
-                title={`${a.name} · ${formatBytes(a.size)}`}
+                title={`${a.name}${a.size ? ` · ${formatBytes(a.size)}` : ""}`}
               >
                 <img
                   src={a.url}

@@ -8,13 +8,17 @@ export const DEFAULT_SETTINGS: Settings = {
   serverUrl: DEFAULT_SERVER_URL,
   webUrl: DEFAULT_WEB_URL,
   token: '',
-  openViewerAfterUpload: true,
+  openViewerAfterUpload: false,
   theme: 'auto',
 };
 
 export async function getSettings(): Promise<Settings> {
   const res = await chrome.storage.local.get(KEY);
-  return { ...DEFAULT_SETTINGS, ...(res[KEY] as Partial<Settings> | undefined) };
+  const current = { ...DEFAULT_SETTINGS, ...(res[KEY] as Partial<Settings> | undefined) };
+  if (current.webUrl === 'http://localhost:4000') {
+    current.webUrl = DEFAULT_WEB_URL;
+  }
+  return current;
 }
 
 export async function saveSettings(patch: Partial<Settings>): Promise<Settings> {

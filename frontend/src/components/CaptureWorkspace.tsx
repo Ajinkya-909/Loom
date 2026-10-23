@@ -1,6 +1,6 @@
 import { Bot, ExternalLink, Loader2, PanelRight, Sparkles, User } from "lucide-react";
 import { useLoom } from "@/lib/store";
-import { PLATFORMS } from "@/lib/platforms";
+import { getPlatformMeta } from "@/lib/platforms";
 import { formatDateTime, timeAgo } from "@/lib/format";
 import type { Asset, CaptureDetail, Message, Output } from "@/lib/types";
 import { Markdown } from "./Markdown";
@@ -22,7 +22,7 @@ interface WorkspaceProps {
 }
 
 function PlatformBadge({ platform }: { platform: CaptureDetail["platform"] }) {
-  const meta = PLATFORMS[platform];
+  const meta = getPlatformMeta(platform);
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold"
@@ -196,8 +196,13 @@ export function CaptureWorkspace({
               <Markdown>{output.markdown}</Markdown>
               <div className="mt-6 flex items-center gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
                 <span>
-                  Distilled by <span className="font-mono">{output.generatedBy}</span> ·{" "}
-                  {timeAgo(output.createdAt)}
+                  Distilled by{" "}
+                  <span className="font-mono">
+                    {typeof output.generatedBy === "object" && output.generatedBy !== null
+                      ? (output.generatedBy as any).model || (output.generatedBy as any).pipeline || "Gemma"
+                      : String(output.generatedBy || "Gemma")}
+                  </span>{" "}
+                  · {timeAgo(output.createdAt)}
                 </span>
                 <button
                   type="button"
@@ -213,22 +218,31 @@ export function CaptureWorkspace({
           ) : (
             <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
               <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-accent text-primary">
-                <Sparkles className="h-5 w-5" />
+                {running ? <Loader2 className="h-5 w-5 loom-spin" /> : <Sparkles className="h-5 w-5" />}
               </span>
-              <h2 className="mt-4 font-serif text-xl font-semibold">No distilled summary yet</h2>
+              <h2 className="mt-4 font-serif text-xl font-semibold">
+                {running ? "Distilling summary with Gemma…" : "No distilled summary yet"}
+              </h2>
               <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Loom will normalize the transcript and distill a five-section summary with your
-                local model.
+                {running
+                  ? "Loom is analyzing the conversation transcript and generating executive insights, decisions, and code deliverables."
+                  : "Loom will normalize the transcript and distill a five-section summary with your local model."}
               </p>
-              <button
-                type="button"
-                onClick={onGenerate}
-                disabled={running}
-                className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-accent-hover disabled:opacity-60"
-              >
-                {running ? <Loader2 className="h-4 w-4 loom-spin" /> : <Sparkles className="h-4 w-4" />}
-                Generate Distilled Summary
-              </button>
+              {!running ? (
+                <button
+                  type="button"
+                  onClick={onGenerate}
+                  className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-accent-hover"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Generate Distilled Summary
+                </button>
+              ) : (
+                <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-accent px-4 py-1.5 text-xs font-medium text-primary">
+                  <Loader2 className="h-3.5 w-3.5 loom-spin" />
+                  {job?.stage || "Summarizing transcript…"} ({job?.progress ?? 0}%)
+                </div>
+              )}
             </div>
           )
         ) : (

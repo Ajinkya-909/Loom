@@ -26,12 +26,12 @@ export function statusFor(s: RunState): { tone: Tone; title: string; detail?: st
         case 'UPLOADING': return { tone: 'busy', title: 'Uploading…' };
       }
       return { tone: 'busy', title: 'Working…' };
-    case 'SUCCESS': return { tone: 'success', title: 'Saved ✓', detail: `Version ${s.version} · processing continues in the viewer` };
+    case 'SUCCESS': return { tone: 'success', title: 'Context created ✓', detail: `Version ${s.version} saved · Ready to view in Loom` };
     case 'PARTIAL_SUCCESS': {
       const k = s.warnings.length;
-      return { tone: 'warn', title: 'Saved with warnings', detail: `${k} ${k === 1 ? 'item' : 'items'} could not be saved` };
+      return { tone: 'warn', title: 'Context created with warnings', detail: `Version ${s.version} saved (${k} ${k === 1 ? 'warning' : 'warnings'})` };
     }
-    case 'DUPLICATE': return { tone: 'neutral', title: 'Already captured', detail: `No changes since version ${s.version}` };
+    case 'DUPLICATE': return { tone: 'neutral', title: 'Already captured', detail: `No changes detected since version ${s.version}` };
     case 'FAILED': return { tone: 'error', title: 'Something went wrong', detail: s.message };
     case 'CANCELLED': return { tone: 'neutral', title: 'Cancelled', detail: 'Nothing was uploaded' };
   }

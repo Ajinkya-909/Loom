@@ -20,9 +20,8 @@ import {
   type Theme,
 } from "@/lib/settings";
 import * as api from "@/lib/api";
-import * as mock from "@/lib/mock";
 
-export type ConnState = "checking" | "connected" | "offline" | "mock";
+export type ConnState = "checking" | "connected" | "offline";
 export type PlatformFilter = "all" | Platform;
 
 interface Connection {
@@ -50,11 +49,16 @@ interface LoomContextValue {
     captureId: string,
     opts?: { onDone?: () => void; onError?: (message: string) => void },
   ) => void;
+  trackJob: (
+    captureId: string,
+    jobId: string,
+    opts?: { onDone?: (outputId?: string) => void; onError?: (message: string) => void },
+    initialStage?: string,
+    initialProgress?: number,
+  ) => void;
 }
 
 const LoomContext = createContext<LoomContextValue | null>(null);
-
-const GEN_STAGES = ["Normalizing transcript…", "Distilling with Gemma…", "Finalizing…"] as const;
 
 export function LoomProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<LoomSettings>(loadSettings);
@@ -67,7 +71,6 @@ export function LoomProvider({ children }: { children: ReactNode }) {
   const [queryDebounced, setQueryDebounced] = useState("");
   const [platform, setPlatform] = useState<PlatformFilter>("all");
   const [generation, setGeneration] = useState<Record<string, JobState>>({});
-  const generationTimers = useRef<Set<number>>(new Set());
 
   /* ---- theme ---- */
   useEffect(() => {
@@ -91,10 +94,6 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   /* ---- connection ---- */
   const refreshConn = useCallback(() => {
-    if (settings.mockMode) {
-      setConn({ state: "mock", config: mock.serverConfig });
-      return;
-    }
     setConn((c) => ({ ...c, state: "checking" }));
     void (async () => {
       const [health, config] = await Promise.all([api.health(settings), api.config(settings)]);
@@ -105,10 +104,9 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     refreshConn();
-    if (settings.mockMode) return;
     const iv = window.setInterval(refreshConn, 20_000);
     return () => window.clearInterval(iv);
-  }, [refreshConn, settings.mockMode]);
+  }, [refreshConn]);
 
   /* ---- capture list ---- */
   useEffect(() => {
@@ -118,13 +116,8 @@ export function LoomProvider({ children }: { children: ReactNode }) {
 
   const loadCaptures = useCallback(async () => {
     setCapturesLoading(true);
-    let items: CaptureListItem[] | null = null;
-    if (!settings.mockMode) {
-      const res = await api.captures(settings, queryDebounced, platform);
-      items = res?.items ?? null;
-    }
-    if (!items) items = mock.listCaptures(queryDebounced, platform);
-    setCaptures(items);
+    const res = await api.captures(settings, queryDebounced, platform);
+    setCaptures(res?.items ?? []);
     setCapturesLoading(false);
   }, [settings, queryDebounced, platform]);
 
@@ -140,21 +133,98 @@ export function LoomProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  /* ---- summary generation (real SSE or simulated) ---- */
+  const activeSubs = useRef<Map<string, () => void>>(new Map());
+
+  /* ---- summary generation (real SSE stream tracking) ---- */
+  const trackJob = useCallback(
+    (
+      captureId: string,
+      jobId: string,
+      opts?: { onDone?: (outputId?: string) => void; onError?: (message: string) => void },
+      initialStage?: string,
+      initialProgress?: number,
+    ) => {
+      setGeneration((prev) => ({
+        ...prev,
+        [captureId]: {
+          status: "RUNNING",
+          stage: initialStage || "Distilling summary with Gemma…",
+          progress: initialProgress || 10,
+        },
+      }));
+
+      // Cancel any existing subscription for this capture to prevent duplicate listeners
+      if (activeSubs.current.has(captureId)) {
+        activeSubs.current.get(captureId)!();
+        activeSubs.current.delete(captureId);
+      }
+
+      const finish = (outputId?: string) => {
+        activeSubs.current.delete(captureId);
+        setGeneration((prev) => ({
+          ...prev,
+          [captureId]: {
+            status: "COMPLETED",
+            stage: "Summary ready",
+            progress: 100,
+            ...(outputId ? { outputId } : {}),
+          },
+        }));
+        opts?.onDone?.(outputId);
+      };
+
+      let lastStage = initialStage || "Distilling summary with Gemma…";
+      let lastProgress = initialProgress || 10;
+
+      const stop = api.subscribeJob(settings, jobId, (ev) => {
+        const status = (ev.status ?? ev.stage ?? "").toUpperCase();
+        if (ev.stage) lastStage = ev.stage;
+        if (typeof ev.progress === "number") {
+          lastProgress = Math.round(ev.progress <= 1 ? ev.progress * 100 : ev.progress);
+        }
+
+        if (status === "COMPLETED") {
+          stop();
+          finish(ev.outputId);
+          return;
+        }
+        if (status === "FAILED") {
+          stop();
+          activeSubs.current.delete(captureId);
+          setGeneration((prev) => ({
+            ...prev,
+            [captureId]: {
+              status: "FAILED",
+              stage: "Failed",
+              progress: lastProgress,
+              error: ev.error ?? "Generation failed",
+            },
+          }));
+          opts?.onError?.(ev.error ?? "Generation failed");
+          return;
+        }
+
+        setGeneration((prev) => ({
+          ...prev,
+          [captureId]: {
+            status: "RUNNING",
+            stage: lastStage === "distilling" ? "Distilling with Gemma…" : lastStage,
+            progress: Math.min(Math.max(lastProgress, 5), 99),
+          },
+        }));
+      });
+
+      activeSubs.current.set(captureId, stop);
+    },
+    [settings],
+  );
+
   const startGeneration = useCallback(
     (captureId: string, opts?: { onDone?: () => void; onError?: (message: string) => void }) => {
-      let alreadyRunning = false;
-      setGeneration((prev) => {
-        if (prev[captureId]?.status === "RUNNING") {
-          alreadyRunning = true;
-          return prev;
-        }
-        return {
-          ...prev,
-          [captureId]: { status: "RUNNING", stage: GEN_STAGES[0], progress: 4 },
-        };
-      });
-      if (alreadyRunning) return;
+      setGeneration((prev) => ({
+        ...prev,
+        [captureId]: { status: "RUNNING", stage: "Contacting server…", progress: 5 },
+      }));
 
       const finish = (outputId?: string) => {
         setGeneration((prev) => ({
@@ -169,90 +239,39 @@ export function LoomProvider({ children }: { children: ReactNode }) {
         opts?.onDone?.();
       };
 
-      if (!settings.mockMode) {
-        void (async () => {
-          const res = await api.generate(settings, captureId, "SUMMARY");
-          if (!res?.jobId) {
-            simulate(); // server unreachable — fall back to the simulated pipeline
-            return;
-          }
-          let lastStage: string = GEN_STAGES[0];
-          let lastProgress = 10;
-          const stop = api.subscribeJob(settings, res.jobId, (ev) => {
-            const status = ev.status ?? ev.stage;
-            lastStage = ev.stage ?? lastStage;
-            if (typeof ev.progress === "number") lastProgress = ev.progress;
-            if (status === "completed" || status === "COMPLETED") {
-              stop();
-              finish(ev.outputId ?? res.outputId);
-              return;
-            }
-            if (status === "failed" || status === "FAILED") {
-              stop();
-              setGeneration((prev) => ({
-                ...prev,
-                [captureId]: {
-                  status: "FAILED",
-                  stage: "Failed",
-                  progress: lastProgress,
-                  error: ev.error ?? "Generation failed",
-                },
-              }));
-              opts?.onError?.(ev.error ?? "Generation failed");
-              return;
-            }
-            setGeneration((prev) => ({
-              ...prev,
-              [captureId]: {
-                status: "RUNNING",
-                stage: lastStage,
-                progress: Math.min(lastProgress, 99),
-              },
-            }));
-          });
-        })();
-        return;
-      }
-
-      simulate();
-
-      function simulate() {
-        let progress = 4;
-        const id = window.setInterval(() => {
-          progress += 5 + Math.random() * 7;
-          if (progress >= 100) {
-            window.clearInterval(id);
-            setGeneration((prev) => ({
-              ...prev,
-              [captureId]: { status: "RUNNING", stage: GEN_STAGES[2], progress: 100 },
-            }));
-            const t = window.setTimeout(() => {
-              generationTimers.current.delete(t);
-              mock.putSummary(captureId);
-              finish(`out_${captureId}`);
-            }, 450);
-            generationTimers.current.add(t);
-            return;
-          }
-          const stage = progress < 32 ? GEN_STAGES[0] : progress < 85 ? GEN_STAGES[1] : GEN_STAGES[2];
-          setGeneration((prev) => ({
-            ...prev,
-            [captureId]: { status: "RUNNING", stage, progress: Math.round(progress) },
-          }));
-        }, 320);
-        generationTimers.current.add(id);
-      }
+      void (async () => {
+        const res = await api.generate(settings, captureId, "SUMMARY");
+        if (res?.outputId && !res.jobId) {
+          finish(res.outputId);
+          return;
+        }
+        if (res?.jobId) {
+          trackJob(captureId, res.jobId, { onDone: () => opts?.onDone?.(), onError: opts?.onError });
+          return;
+        }
+        setGeneration((prev) => ({
+          ...prev,
+          [captureId]: {
+            status: "FAILED",
+            stage: "Failed",
+            progress: 0,
+            error: "Failed to connect to summarization engine.",
+          },
+        }));
+        opts?.onError?.("Failed to connect to summarization engine.");
+      })();
     },
-    [settings],
+    [settings, trackJob],
   );
 
-  useEffect(
-    () => () => {
-      generationTimers.current.forEach((t) => window.clearTimeout(t));
-      generationTimers.current.clear();
-    },
-    [],
-  );
+  useEffect(() => {
+    const subs = activeSubs.current;
+    return () => {
+      subs.forEach((stop) => stop());
+      subs.clear();
+    };
+  }, []);
+
 
   const value = useMemo<LoomContextValue>(
     () => ({
@@ -272,6 +291,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       reloadCaptures: () => void loadCaptures(),
       generation,
       startGeneration,
+      trackJob,
     }),
     [
       settings,
@@ -288,6 +308,7 @@ export function LoomProvider({ children }: { children: ReactNode }) {
       loadCaptures,
       generation,
       startGeneration,
+      trackJob,
     ],
   );
 

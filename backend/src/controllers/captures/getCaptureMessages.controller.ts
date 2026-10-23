@@ -42,7 +42,7 @@ export async function getCaptureMessagesController(req: Request, res: Response) 
     const items = messages.map((m) => ({
       id: m.id,
       idx: m.idx,
-      role: m.role,
+      role: m.role.toLowerCase(),
       textPlain: m.textPlain,
       blocks: m.blocks,
       tokenEstimate: m.tokenEstimate,

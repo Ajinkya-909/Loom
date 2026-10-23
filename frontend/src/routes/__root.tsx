@@ -76,14 +76,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Loom — ContextPort" },
+      { title: "Loom — AI Chat Library" },
       {
         name: "description",
         content:
           "Capture, distill, and export AI chat sessions from ChatGPT, Claude, Gemini, DeepSeek, and Perplexity.",
       },
       { name: "author", content: "Loom" },
-      { property: "og:title", content: "Loom — ContextPort" },
+      { property: "og:title", content: "Loom — AI Chat Library" },
       {
         property: "og:description",
         content:
@@ -104,7 +104,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400..700&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/icon48.png", type: "image/png" },
+      { rel: "shortcut icon", href: "/icon48.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/icon128.png" },
     ],
   }),
   shellComponent: RootShell,

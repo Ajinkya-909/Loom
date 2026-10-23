@@ -17,6 +17,36 @@ export function ActionButtons({ state, gemmaEnabled, onStart, onCancel, onRetry,
   const summarizeOn = enabled && gemmaEnabled;
   const viewerUrl = state.kind === 'SUCCESS' || state.kind === 'PARTIAL_SUCCESS' || state.kind === 'DUPLICATE' ? state.viewerUrl : null;
 
+  if (viewerUrl) {
+    return (
+      <div className="actions">
+        <button
+          type="button"
+          className="btn primary"
+          onClick={() => onOpenViewer(viewerUrl)}
+        >
+          Open in Loom Dashboard <External />
+        </button>
+        <button
+          type="button"
+          className="btn secondary"
+          onClick={() => window.close()}
+        >
+          Close
+        </button>
+        {state.kind === 'DUPLICATE' ? (
+          <button type="button" className="btn ghost" onClick={() => onRetry({ force: true })}>
+            Capture again anyway
+          </button>
+        ) : (
+          <button type="button" className="btn ghost" onClick={() => onStart('context')}>
+            Capture another version
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="actions">
       <button type="button" className="btn primary" disabled={!enabled} onClick={() => onStart('context')}>
@@ -37,12 +67,6 @@ export function ActionButtons({ state, gemmaEnabled, onStart, onCancel, onRetry,
       )}
       {state.kind === 'FAILED' && state.code === 'PAYLOAD_TOO_LARGE' && (
         <button type="button" className="btn ghost" onClick={() => onRetry({ skipAssets: true })}>Retry without images</button>
-      )}
-      {viewerUrl && (
-        <button type="button" className="btn ghost" onClick={() => onOpenViewer(viewerUrl)}>Open in ContextPort <External /></button>
-      )}
-      {state.kind === 'DUPLICATE' && (
-        <button type="button" className="btn ghost" onClick={() => onRetry({ force: true })}>Capture again anyway</button>
       )}
     </div>
   );
