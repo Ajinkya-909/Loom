@@ -1,29 +1,11 @@
-import { Router, Request, Response } from 'express';
-import { prisma } from '../db/prisma';
+import { Router } from 'express';
+import { getHealthController } from '../controllers/health';
 
 const router = Router();
 
-router.get(['/health', '/api/health'], async (_req: Request, res: Response) => {
-  let dbStatus = 'disconnected';
-
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    dbStatus = 'connected';
-  } catch (error) {
-    dbStatus = 'error';
-  }
-
-  const isHealthy = dbStatus === 'connected';
-
-  res.status(isHealthy ? 200 : 503).json({
-    status: isHealthy ? 'ok' : 'degraded',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    services: {
-      server: 'running',
-      database: dbStatus,
-    },
-  });
-});
+// ============================================================================
+// GET /health and GET /api/health — System & Database Health Check
+// ============================================================================
+router.get(['/health', '/api/health'], getHealthController);
 
 export const healthRouter = router;
