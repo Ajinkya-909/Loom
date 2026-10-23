@@ -9,6 +9,7 @@ export const platformEnum = z.enum([
   'GEMINI',
   'DEEPSEEK',
   'PERPLEXITY',
+  'GROK',
   'GENERIC',
 ]);
 
