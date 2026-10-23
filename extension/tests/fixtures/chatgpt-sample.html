@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Auth refactor: JWT vs sessions - ChatGPT</title>
+    <script>window.__secret = "scripts must be stripped";</script>
+  </head>
+  <body>
+    <button aria-label="Model selector" data-testid="model-switcher-dropdown-button">GPT-5</button>
+    <main>
+      <div id="thread" style="overflow-y: auto">
+        <article data-testid="conversation-turn-1" data-turn="user">
+          <div data-message-author-role="user" data-message-id="msg-u1">
+            <div>Should we move our API from sessions to JWT?</div>
+          </div>
+        </article>
+
+        <article data-testid="conversation-turn-2" data-turn="assistant">
+          <div data-message-author-role="assistant" data-message-id="msg-a1">
+            <p>Short answer: it depends on revocation needs. Here is a minimal verifier:</p>
+            <pre><code class="language-ts">export function verify(token: string) {
+  return jwt.verify(token, process.env.JWT_SECRET!);
+}</code></pre>
+            <table>
+              <thead><tr><th>Approach</th><th>Revocation</th></tr></thead>
+              <tbody>
+                <tr><td>Sessions</td><td>Easy</td></tr>
+                <tr><td>JWT</td><td>Hard</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article data-testid="conversation-turn-3" data-turn="user">
+          <div data-message-author-role="user" data-message-id="msg-u2">
+            <div>Can you show the latency impact?</div>
+          </div>
+        </article>
+
+        <article data-testid="conversation-turn-4" data-turn="assistant">
+          <div data-message-author-role="assistant" data-message-id="msg-a2">
+            <p>Here is the measured latency per approach:</p>
+            <img src="https://files.example.com/latency.png" alt="Latency chart" width="512" height="256" />
+            <pre><code>p50: 12ms  p95: 40ms</code></pre>
+            <button aria-label="Copy"><img src="https://files.example.com/icon.png" alt="copy icon" width="16" height="16" /></button>
+          </div>
+        </article>
+      </div>
+    </main>
+  </body>
+</html>

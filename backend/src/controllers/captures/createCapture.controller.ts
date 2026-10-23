@@ -30,24 +30,32 @@ import { jobEvents } from '../../pipeline/jobEvents';
 export async function createCaptureController(req: Request, res: Response) {
   try {
     // ==================================================================
-    // Step 1: Extract uploaded files
+    // Step 1: Extract uploaded files (support both upload.any() array and fields object)
     // ==================================================================
-    const files = req.files as
-      | { [fieldname: string]: Express.Multer.File[] }
-      | undefined;
-    const snapshotFile = files?.snapshot?.[0];
-    const assetFiles = files?.assets || [];
+    const rawFilesList: Express.Multer.File[] = Array.isArray(req.files)
+      ? req.files
+      : req.files
+      ? Object.values(req.files).flat()
+      : [];
+
+    const snapshotFile = rawFilesList.find((f) => f.fieldname === 'snapshot');
+    const metaFile = rawFilesList.find((f) => f.fieldname === 'meta');
+    const messagesFile = rawFilesList.find((f) => f.fieldname === 'messages');
+    const assetFiles = rawFilesList.filter(
+      (f) => f.fieldname === 'assets' || f.fieldname.startsWith('asset')
+    );
 
     // ==================================================================
-    // Step 2: Parse and validate optional "meta" field
+    // Step 2: Parse and validate optional "meta" field (from body or meta.json file)
     // ==================================================================
     let metaParsed: any = {};
-    if (req.body?.meta) {
+    const rawMetaSource = req.body?.meta || (metaFile ? metaFile.buffer.toString('utf-8') : undefined);
+    if (rawMetaSource) {
       try {
         metaParsed =
-          typeof req.body.meta === 'string'
-            ? JSON.parse(req.body.meta)
-            : req.body.meta;
+          typeof rawMetaSource === 'string'
+            ? JSON.parse(rawMetaSource)
+            : rawMetaSource;
       } catch {
         return res.status(400).json({
           error: {
@@ -55,6 +63,28 @@ export async function createCaptureController(req: Request, res: Response) {
             message: 'Invalid JSON in "meta" field.',
           },
         });
+      }
+    }
+
+    // Normalize meta properties for extension compatibility
+    if (metaParsed && typeof metaParsed === 'object') {
+      if (typeof metaParsed.platform === 'string') {
+        metaParsed.platform = metaParsed.platform.toUpperCase();
+      }
+      if (metaParsed.action === 'summarize') {
+        metaParsed.mode = 'SUMMARIZE';
+      } else if (metaParsed.action === 'context') {
+        metaParsed.mode = 'CONTEXT_ONLY';
+      } else if (!metaParsed.mode) {
+        metaParsed.mode = 'CONTEXT_ONLY';
+      }
+      if (metaParsed.expected && typeof metaParsed.expected === 'object') {
+        metaParsed.stats = {
+          expectedMessages: metaParsed.expected.messageCount,
+          expectedCodeBlocks: metaParsed.expected.codeBlockCount,
+          expectedImages: metaParsed.expected.imageCount,
+          ...(metaParsed.stats || {}),
+        };
       }
     }
 
@@ -71,7 +101,7 @@ export async function createCaptureController(req: Request, res: Response) {
     const meta = metaResult.data;
 
     // ==================================================================
-    // Step 3: Extract or scrape messages
+    // Step 3: Extract or scrape messages (from body, messages.json file, or snapshot)
     // ==================================================================
     let messages: Array<{
       idx: number;
@@ -90,19 +120,34 @@ export async function createCaptureController(req: Request, res: Response) {
       }
     }
 
-    if (req.body?.messages) {
-      let rawMessages: unknown;
+    const rawMessagesSource = req.body?.messages || (messagesFile ? messagesFile.buffer.toString('utf-8') : undefined);
+    if (rawMessagesSource) {
+      let rawMessages: any;
       try {
         rawMessages =
-          typeof req.body.messages === 'string'
-            ? JSON.parse(req.body.messages)
-            : req.body.messages;
+          typeof rawMessagesSource === 'string'
+            ? JSON.parse(rawMessagesSource)
+            : rawMessagesSource;
       } catch {
         return res.status(400).json({
           error: {
             code: 'VALIDATION_ERROR',
             message: 'Invalid JSON in "messages" field.',
           },
+        });
+      }
+
+      // Normalize message roles (e.g. 'user' -> 'USER', 'tool' -> 'SYSTEM')
+      if (Array.isArray(rawMessages)) {
+        rawMessages = rawMessages.map((m: any) => {
+          if (m && typeof m.role === 'string') {
+            const roleUpper = m.role.toUpperCase();
+            return {
+              ...m,
+              role: roleUpper === 'TOOL' ? 'SYSTEM' : roleUpper,
+            };
+          }
+          return m;
         });
       }
 
@@ -191,16 +236,17 @@ export async function createCaptureController(req: Request, res: Response) {
     // ==================================================================
     // Step 7: Deduplication check
     // ==================================================================
+    const force = req.query.force === '1' || req.query.force === 'true';
     const latestCapture = await prisma.capture.findFirst({
       where: { chatId: chat.id },
       orderBy: { version: 'desc' },
     });
 
-    if (latestCapture && latestCapture.contentHash === contentHash) {
+    if (!force && latestCapture && latestCapture.contentHash === contentHash) {
       console.log(
         `♻️  Duplicate detected for Chat [${chat.id}] — returning existing capture v${latestCapture.version}`
       );
-      return res.status(202).json({
+      return res.status(200).json({
         chatId: chat.id,
         captureId: latestCapture.id,
         version: latestCapture.version,
@@ -268,15 +314,36 @@ export async function createCaptureController(req: Request, res: Response) {
       mime: string;
     }> = [];
 
+    const clientAssets: any[] = Array.isArray(metaParsed?.assets) ? metaParsed.assets : [];
+
     for (const assetFile of assetFiles) {
       const assetId = crypto.randomUUID();
-      const messageIdx = extractMessageIdxFromFilename(assetFile.originalname);
+      const refFromField = assetFile.fieldname.startsWith('asset:')
+        ? assetFile.fieldname.slice(6)
+        : assetFile.fieldname;
+      const matchedClientAsset = clientAssets.find(
+        (a: any) => a.ref === refFromField || a.filename === assetFile.originalname
+      );
+      const messageIdx =
+        matchedClientAsset && typeof matchedClientAsset.messageIdx === 'number'
+          ? matchedClientAsset.messageIdx
+          : extractMessageIdxFromFilename(assetFile.originalname);
+
+      const resolvedFilename = matchedClientAsset?.filename || assetFile.originalname;
+      let resolvedMime = assetFile.mimetype;
+      if ((!resolvedMime || resolvedMime === 'application/octet-stream') && matchedClientAsset?.mime) {
+        resolvedMime = matchedClientAsset.mime;
+      }
+      if (/\.pdf$/i.test(resolvedFilename) || /\.pdf$/i.test(assetFile.originalname)) {
+        resolvedMime = 'application/pdf';
+      }
 
       const { localPath, sha256 } = await fileStore.saveAssetFile(
         dirs.assetsDir,
         assetId,
         assetFile.buffer,
-        assetFile.mimetype
+        resolvedMime,
+        resolvedFilename
       );
 
       const asset = await prisma.asset.create({
@@ -284,7 +351,7 @@ export async function createCaptureController(req: Request, res: Response) {
           id: assetId,
           captureId: capture.id,
           messageIdx,
-          mime: assetFile.mimetype,
+          mime: resolvedMime,
           originalUrl: null,
           localPath,
           sha256,

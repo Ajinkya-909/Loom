@@ -96,10 +96,18 @@ export async function saveAssetFile(
   assetsDir: string,
   assetId: string,
   buffer: Buffer,
-  mime: string
+  mime: string,
+  originalFilename?: string
 ): Promise<SavedAssetInfo> {
-  const ext = mimeToExtension(mime);
-  const filename = `${assetId}.${ext}`;
+  const ext = mimeToExtension(mime, originalFilename);
+  const cleanOriginalName = originalFilename
+    ? path.basename(originalFilename).replace(/[^\w.\-]+/g, '_').slice(-80)
+    : '';
+  const isGeneric = !cleanOriginalName || /^(image|file|asset)[_-]?\d*\.[a-z0-9]+$/i.test(cleanOriginalName);
+  let filename = isGeneric ? `${assetId}.${ext}` : `${assetId}-${cleanOriginalName}`;
+  if (!filename.toLowerCase().endsWith(`.${ext}`)) {
+    filename = `${filename}.${ext}`;
+  }
   const filePath = path.join(assetsDir, filename);
 
   await fs.writeFile(filePath, buffer);
@@ -145,13 +153,27 @@ export function computeContentHash(messages: Array<{ text: string }>): string {
 // Utility: MIME type → file extension mapping
 // ============================================================================
 
-function mimeToExtension(mime: string): string {
+function mimeToExtension(mime: string, originalFilename?: string): string {
+  if (originalFilename) {
+    const ext = path.extname(originalFilename).replace(/^\./, '').toLowerCase();
+    if (ext && /^[a-z0-9]{2,5}$/.test(ext)) return ext;
+  }
   const map: Record<string, string> = {
     'image/png': 'png',
     'image/jpeg': 'jpg',
     'image/webp': 'webp',
     'image/svg+xml': 'svg',
     'image/gif': 'gif',
+    'image/avif': 'avif',
+    'application/pdf': 'pdf',
+    'text/csv': 'csv',
+    'text/plain': 'txt',
+    'application/zip': 'zip',
+    'application/json': 'json',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+    'application/msword': 'doc',
     'text/html': 'html',
     'application/xhtml+xml': 'html',
   };

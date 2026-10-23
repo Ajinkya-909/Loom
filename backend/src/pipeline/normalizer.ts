@@ -349,10 +349,16 @@ export function buildContextMarkdown(
       sections.push('');
     }
 
-    // Inline asset references for images associated with this message
+    // Inline asset references for images and attached documents associated with this message
     const messageAssets = assets.filter((a) => a.messageIdx === msg.idx);
     for (const asset of messageAssets) {
-      sections.push(`![Asset](${asset.localPath})`);
+      if (asset.mime.startsWith('image/')) {
+        sections.push(`![Asset](${asset.localPath})`);
+      } else {
+        const rawName = asset.localPath.split('/').pop() || 'document';
+        const docName = rawName.replace(/^[0-9a-fA-F\-]{36}[_-]?/, '') || rawName;
+        sections.push(`[📎 Attached File: ${docName}](${asset.localPath})`);
+      }
       sections.push('');
     }
 

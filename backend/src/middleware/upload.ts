@@ -29,8 +29,9 @@ const upload = multer({
     fields: MAX_TEXT_FIELDS,
   },
   fileFilter: (_req, file, cb) => {
+    // Snapshot HTML file
     if (file.fieldname === 'snapshot') {
-      const isHtmlExt = /\.(html|htm)$/i.test(file.originalname);
+      const isHtmlExt = /\.(html|htm|xhtml)$/i.test(file.originalname);
       if (ALLOWED_SNAPSHOT_MIMES.has(file.mimetype) || isHtmlExt) {
         cb(null, true);
       } else {
@@ -40,24 +41,15 @@ const upload = multer({
           )
         );
       }
-    } else if (file.fieldname === 'assets') {
-      // Allow image, stylesheet, script, font, or binary asset files
-      cb(null, true);
     } else {
-      cb(
-        new Error(
-          `Unexpected file field: "${file.fieldname}". Only "snapshot" and "assets" are accepted.`
-        )
-      );
+      // Allow meta.json, messages.json, and all binary asset files (asset:ref, assets, images)
+      cb(null, true);
     }
   },
 });
 
-// Configure expected multipart file fields
-const captureFields = upload.fields([
-  { name: 'snapshot', maxCount: 1 },
-  { name: 'assets', maxCount: 20 },
-]);
+// Configure capture fields using any() to flexibly accept snapshot, meta.json, messages.json, and asset:*
+const captureFields = upload.any();
 
 // ============================================================================
 // Exported middleware with clean error wrapping

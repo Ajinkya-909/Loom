@@ -3,3 +3,4 @@ export * as outputsController from './outputs';
 export * as assetsController from './assets';
 export * as healthController from './health';
 export * as jobsController from './jobs';
+export * as configController from './config';
