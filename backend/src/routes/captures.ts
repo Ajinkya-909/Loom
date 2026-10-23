@@ -6,6 +6,7 @@ import {
   getCaptureController,
   getCaptureMessagesController,
   exportCaptureController,
+  generateSummaryController,
 } from '../controllers/captures';
 
 const router = Router();
@@ -28,5 +29,8 @@ router.get('/api/captures/:id/messages', getCaptureMessagesController);
 
 // GET /api/captures/:id/export — 1-Click Multi-Format Artifact Exporter
 router.get('/api/captures/:id/export', exportCaptureController);
+
+// POST /api/captures/:id/generate — On-Demand Distilled Summary Generation
+router.post('/api/captures/:id/generate', generateSummaryController);
 
 export const capturesRouter = router;
