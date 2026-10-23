@@ -60,6 +60,7 @@
       "CHATGPT",
       "CLAUDE",
       "GEMINI",
+      "GROK",
       "DEEPSEEK",
       "PERPLEXITY",
       "GENERIC"
@@ -384,22 +385,23 @@
 * **URL Parameters:**
   * `id` (`UUID`): Capture ID.
 * **Query Parameters:**
-  * `format` (`enum`, required): `context` | `summary` | `zip`
-* **Formats:**
-  * `?format=context`: Streams `context.md` as attachment (`Content-Disposition: attachment; filename="<title>-context.md"`).
-  * `?format=summary`: Streams `summary.md` as attachment (`Content-Disposition: attachment; filename="<title>-summary.md"`).
-  * `?format=zip`: Streams an on-the-fly `.zip` bundle containing:
+  * `format` (`enum`, optional, default: `zip`): `context` | `summary` | `zip`
+* **Formats & Behavior:**
+  * `?format=context`: Streams only the canonical `context.md` transcript as an attachment (`Content-Disposition: attachment; filename="<title>-v<N>-context.md"`).
+  * `?format=summary`: Streams only the distilled `summary.md` deliverable as an attachment (`Content-Disposition: attachment; filename="<title>-v<N>-summary.md"`). If the summary has not yet been generated for this capture, returns `404 SUMMARY_NOT_FOUND` with clear user guidance.
+  * `?format=zip` (default): Streams an on-the-fly, maximum-compression `.zip` archive bundle containing:
     ```
     loom-export-<title>-v<N>/
-    ├── context.md
-    ├── summary.md
-    ├── metadata.json
-    ├── assets/
-    │   └── [all rescued image files]
-    └── raw/
-        └── snapshot.html
+    ├── context.md          # Canonical request-response transcript
+    ├── summary.md          # Distilled summary (included if generated)
+    ├── metadata.json       # Complete session metadata, token counts, asset mappings & timestamps
+    ├── assets/             # Rescued screenshots, diagrams, and image attachments
+    │   └── [all rescued image/media files]
+    └── raw/                # Original unedited sources for full reproducibility
+        ├── snapshot.html   # Full browser DOM snapshot
+        └── messages.json   # Extracted messages payload
     ```
-* **Success Response (`200 OK`):** Attachment download stream.
+* **Success Response (`200 OK`):** Attachment download stream (`text/markdown` or `application/zip`).
 
 ---
 
@@ -438,16 +440,16 @@
 
 ## 7. Endpoint Summary Matrix
 
-| Method | Path | Consumer | Primary Purpose |
-|---|---|---|---|
-| `GET` | `/health` | Docker / Dev | Health & DB ping |
-| `GET` | `/api/config` | Extension / Web | Extension ping & LLM feature flags |
-| `POST` | `/api/captures` | Extension | **Core Ingest**: Save raw files, generate `context.md` |
-| `GET` | `/api/captures` | Web App | Left sidebar library list with search |
-| `GET` | `/api/captures/:id` | Web App | Capture header, versions, outputs list |
-| `GET` | `/api/captures/:id/messages` | Web App | Message-by-message transcript view |
-| `POST` | `/api/captures/:id/generate` | Web App | On-demand Gemma summarization |
-| `GET` | `/api/outputs/:id` | Web App | Load `context.md` or `summary.md` markdown |
-| `GET` | `/api/assets/:id` | Web App | Stream images & chart assets |
-| `GET` | `/api/captures/:id/export` | Web App | Download `context.md`, `summary.md`, or `.zip` |
-| `GET` | `/api/jobs/:id/events` | Extension / Web | Live SSE progress updates |
+| Method | Path | Consumer | Primary Purpose | Implementation Status |
+|---|---|---|---|---|
+| `GET` | `/health` | Docker / Dev | Health & DB ping | ✅ **Implemented & Verified** |
+| `POST` | `/api/captures` | Extension | **Core Ingest**: Save raw files, auto-detect platform (ChatGPT, Claude, Gemini, Grok, Perplexity), generate `context.md` | ✅ **Implemented & Verified** |
+| `GET` | `/api/captures` | Web App | Left sidebar library list with full-text search & pagination | ✅ **Implemented & Verified** |
+| `GET` | `/api/captures/:id` | Web App | Capture header, fidelity stats, versions, outputs list | ✅ **Implemented & Verified** |
+| `GET` | `/api/captures/:id/messages` | Web App | Message-by-message transcript with typed blocks | ✅ **Implemented & Verified** |
+| `GET` | `/api/outputs/:id` | Web App | Load `context.md` or `summary.md` (JSON or raw markdown stream) | ✅ **Implemented & Verified** |
+| `GET` | `/api/assets/:id` | Web App | Stream images & chart assets with caching headers | ✅ **Implemented & Verified** |
+| `GET` | `/api/captures/:id/export` | Web App | Download `context.md`, `summary.md`, or full `.zip` bundle | ✅ **Implemented & Verified** |
+| `GET` | `/api/config` | Extension / Web | Extension ping & LLM feature flags | ⏳ **Pending** |
+| `POST` | `/api/captures/:id/generate` | Web App | On-demand Gemma / Gemini summarization | ⏳ **Pending** |
+| `GET` | `/api/jobs/:id/events` | Extension / Web | Live SSE progress updates | ⏳ **Pending** |
