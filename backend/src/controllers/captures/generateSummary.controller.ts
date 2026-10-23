@@ -135,11 +135,28 @@ export async function generateSummaryController(req: Request, res: Response) {
           captureId: capture.id,
         });
 
-        // Run Local Gemma or Gemini Fallback
+        // Run Local Gemma or Gemini Fallback with progressive chunk tracking
         const { markdown, generatedBy } = await distillTranscriptToSummary(
           capture.chat.title,
           capture.chat.platform,
-          contextMarkdown
+          contextMarkdown,
+          async (stageName, progressVal) => {
+            try {
+              await prisma.job.update({
+                where: { id: job.id },
+                data: { stage: stageName, progress: progressVal },
+              });
+              jobEvents.emitStage({
+                jobId: job.id,
+                stage: stageName,
+                progress: progressVal,
+                status: 'RUNNING',
+                captureId: capture.id,
+              });
+            } catch (updateErr) {
+              console.warn(`Failed to update job progress for ${job.id}:`, updateErr);
+            }
+          }
         );
 
         // Save summary.md to disk

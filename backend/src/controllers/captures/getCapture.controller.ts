@@ -42,6 +42,18 @@ export async function getCaptureController(req: Request, res: Response) {
           },
           orderBy: { messageIdx: 'asc' },
         },
+        jobs: {
+          select: {
+            id: true,
+            type: true,
+            stage: true,
+            status: true,
+            progress: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
     });
 
@@ -87,6 +99,7 @@ export async function getCaptureController(req: Request, res: Response) {
         mime: a.mime,
         localPath: a.localPath,
       })),
+      activeJob: capture.jobs[0] || null,
     });
   } catch (error) {
     console.error(`❌ Failed to retrieve capture "${req.params.id}":`, error);

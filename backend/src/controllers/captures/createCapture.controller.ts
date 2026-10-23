@@ -7,7 +7,11 @@ import * as fileStore from '../../storage/fileStore';
 import * as normalizer from '../../pipeline/normalizer';
 import type { Block } from '../../pipeline/normalizer';
 import { scrapeChatHtml } from '../../pipeline/htmlScraper';
+import path from 'path';
+import fs from 'fs';
 import { extractMessageIdxFromFilename } from '../../utils/file';
+import { distillTranscriptToSummary } from '../../pipeline/summarizer';
+import { jobEvents } from '../../pipeline/jobEvents';
 
 /**
  * POST /api/captures — Core Ingestion & Normalization Controller
@@ -421,13 +425,100 @@ export async function createCaptureController(req: Request, res: Response) {
     );
 
     // ==================================================================
-    // Step 18: Return 202 Accepted
+    // Step 18: If mode === 'SUMMARIZE', spawn background distillation job
+    // ==================================================================
+    let summarizeJobId: string | null = null;
+    if (meta.mode === 'SUMMARIZE') {
+      const sumJob = await prisma.job.create({
+        data: {
+          captureId: capture.id,
+          type: 'SUMMARIZE',
+          stage: 'queued',
+          status: 'RUNNING',
+          progress: 0.1,
+        },
+      });
+      summarizeJobId = sumJob.id;
+
+      // Spawn async distillation decoupled from the request
+      (async () => {
+        try {
+          const { markdown, generatedBy } = await distillTranscriptToSummary(
+            resolvedTitle,
+            resolvedPlatform,
+            contextMarkdown,
+            async (stageName, progressVal) => {
+              try {
+                await prisma.job.update({
+                  where: { id: sumJob.id },
+                  data: { stage: stageName, progress: progressVal },
+                });
+                jobEvents.emitStage({
+                  jobId: sumJob.id,
+                  stage: stageName,
+                  progress: progressVal,
+                  status: 'RUNNING',
+                  captureId: capture.id,
+                });
+              } catch (progressErr) {
+                console.warn(`Failed to update progress for summarize job ${sumJob.id}:`, progressErr);
+              }
+            }
+          );
+
+          // Save summary.md to disk
+          const summaryDiskPath = path.resolve(dirs.root, 'summary.md');
+          await fs.promises.writeFile(summaryDiskPath, markdown, 'utf-8');
+
+          const relativeSummaryPath = `${rawPath}/summary.md`;
+          const summaryOutput = await prisma.output.create({
+            data: {
+              captureId: capture.id,
+              kind: 'SUMMARY',
+              markdown,
+              filePath: relativeSummaryPath,
+              generatedBy,
+            },
+          });
+
+          await prisma.job.update({
+            where: { id: sumJob.id },
+            data: { stage: 'completed', status: 'COMPLETED', progress: 1.0 },
+          });
+
+          jobEvents.emitDone({
+            jobId: sumJob.id,
+            stage: 'completed',
+            progress: 1.0,
+            status: 'COMPLETED',
+            outputId: summaryOutput.id,
+            captureId: capture.id,
+          });
+        } catch (sumErr: any) {
+          console.error(`❌ Background auto-summarize failed for Job [${sumJob.id}]:`, sumErr);
+          await prisma.job.update({
+            where: { id: sumJob.id },
+            data: { stage: 'failed', status: 'FAILED', error: sumErr?.message || 'Auto-summary failed.' },
+          });
+          jobEvents.emitError({
+            jobId: sumJob.id,
+            stage: 'failed',
+            status: 'FAILED',
+            error: sumErr?.message || 'Auto-summary failed.',
+            captureId: capture.id,
+          });
+        }
+      })();
+    }
+
+    // ==================================================================
+    // Step 19: Return 202 Accepted
     // ==================================================================
     return res.status(202).json({
       chatId: chat.id,
       captureId: capture.id,
       version,
-      jobId: job.id,
+      jobId: summarizeJobId || job.id,
       status: 'READY',
       viewerUrl: `/c/${capture.id}`,
       duplicate: false,
