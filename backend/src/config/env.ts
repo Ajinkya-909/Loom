@@ -9,13 +9,13 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(4000),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required and cannot be empty'),
 
-  // Local LLM (Ollama / Gemma)
+  // Local LLM (Ollama / Gemma 4)
   OLLAMA_BASE_URL: z.string().default('http://localhost:11434'),
-  OLLAMA_MODEL: z.string().default('gemma:2b'),
+  OLLAMA_MODEL: z.string().default('gemma4'),
 
   // Cloud LLM Fallback (Google Gemini)
   GEMINI_API_KEY: z.string().optional().default(''),
-  GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
+  GEMINI_MODEL: z.string().default('gemini-3.1-flash-lite'),
 });
 
 const parsed = envSchema.safeParse(process.env);

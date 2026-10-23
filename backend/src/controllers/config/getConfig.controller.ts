@@ -17,9 +17,9 @@ export async function getConfigController(_req: Request, res: Response) {
 
   const llmProvider = hasOllama ? 'GEMMA_LOCAL' : hasGemini ? 'GEMINI_FALLBACK' : 'NONE';
   const llmModel = hasOllama
-    ? (process.env.OLLAMA_MODEL || 'gemma:2b')
+    ? (process.env.OLLAMA_MODEL || 'gemma4')
     : hasGemini
-    ? (process.env.GEMINI_MODEL || 'gemini-3.8-flash')
+    ? (process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite')
     : 'none';
 
   return res.status(200).json({

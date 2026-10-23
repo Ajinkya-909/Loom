@@ -67,9 +67,11 @@ export async function generateWithLocalGemma(
 }
 
 /**
- * Invokes Google Gemini API as cloud fallback.
+/**
+ * Direct call to Google Gemini REST endpoint for a specific model.
  */
-export async function generateWithGemini(
+async function callGeminiApi(
+  modelName: string,
   prompt: string,
   systemPrompt?: string
 ): Promise<string> {
@@ -77,9 +79,10 @@ export async function generateWithGemini(
     throw new Error('GEMINI_API_KEY is not configured in .env');
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${env.GEMINI_API_KEY}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000);
+  // 60-second timeout per generation attempt
+  const timeout = setTimeout(() => controller.abort(), 60000);
 
   try {
     const fullText = systemPrompt
@@ -106,27 +109,63 @@ export async function generateWithGemini(
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`Gemini API error [HTTP ${res.status}]: ${errText || res.statusText}`);
+      throw new Error(`Gemini API error [HTTP ${res.status} for ${modelName}]: ${errText || res.statusText}`);
     }
 
     const data = (await res.json()) as any;
-    const candidateText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!candidateText) {
-      throw new Error('Gemini API returned an empty completion.');
+      throw new Error(`Gemini API returned an empty completion for ${modelName}.`);
     }
 
     return candidateText.trim();
+  } catch (err: any) {
+    if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+      throw new Error(`Gemini request timed out or was aborted for model ${modelName}`);
+    }
+    throw err;
   } finally {
     clearTimeout(timeout);
   }
 }
 
 /**
+ * Invokes Google Gemini API as cloud fallback with automatic backup model cascade.
+ * If the configured model (e.g. gemini-3.8-flash) experiences high demand (HTTP 503)
+ * or times out, it automatically falls back to gemini-3.1-flash-lite.
+ */
+export async function generateWithGemini(
+  prompt: string,
+  systemPrompt?: string
+): Promise<{ text: string; model: string }> {
+  const primaryModel = env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
+  const backupModel = primaryModel === 'gemini-3.1-flash-lite' ? 'gemini-3.8-flash' : 'gemini-3.1-flash-lite';
+
+  try {
+    console.log(`🌐 Calling primary Gemini model (${primaryModel})...`);
+    const text = await callGeminiApi(primaryModel, prompt, systemPrompt);
+    return { text, model: primaryModel };
+  } catch (primaryErr: any) {
+    console.warn(`⚠️ Primary Gemini model (${primaryModel}) failed: ${primaryErr?.message || primaryErr}`);
+    console.log(`🔄 Attempting backup Gemini model (${backupModel})...`);
+
+    try {
+      const text = await callGeminiApi(backupModel, prompt, systemPrompt);
+      console.log(`✅ Backup Gemini model (${backupModel}) succeeded!`);
+      return { text, model: backupModel };
+    } catch (backupErr: any) {
+      throw new Error(
+        `All Gemini models failed. Primary (${primaryModel}): ${primaryErr?.message || primaryErr} | Backup (${backupModel}): ${backupErr?.message || backupErr}`
+      );
+    }
+  }
+}
+
+/**
  * High-level generation function with automatic fallback:
  * 1. Tries local Gemma first.
- * 2. If unreachable or fails, falls back to Gemini API.
+ * 2. If unreachable or fails, falls back to Gemini API (with backup model cascade).
  */
 export async function generateWithFallback(
   prompt: string,
@@ -152,14 +191,13 @@ export async function generateWithFallback(
   }
 
   // Step 2: Attempt Google Gemini Fallback
-  console.log(`🌐 Falling back to Google Gemini (${env.GEMINI_MODEL})...`);
   try {
-    const text = await generateWithGemini(prompt, systemPrompt);
-    console.log(`✅ Gemini fallback generated summary successfully (${text.length} chars)`);
+    const { text, model: usedModel } = await generateWithGemini(prompt, systemPrompt);
+    console.log(`✅ Gemini generated summary successfully via ${usedModel} (${text.length} chars)`);
     return {
       text,
       provider: 'GEMINI_FALLBACK',
-      model: env.GEMINI_MODEL,
+      model: usedModel,
     };
   } catch (geminiErr: any) {
     console.error(`❌ Gemini fallback failed: ${geminiErr?.message || geminiErr}`);

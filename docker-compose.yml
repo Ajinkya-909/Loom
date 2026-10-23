@@ -36,9 +36,9 @@ services:
       PORT: ${BACKEND_PORT:-4000}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-loom_db}?schema=public
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma:2b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     volumes:
@@ -67,32 +67,31 @@ services:
       - backend
 
   # ---------------------------------------------------------------------------
-  # 4. Local Gemma 4 / Gemma Model Server (Ollama)
-  # [CURRENTLY COMMENTED OUT to save memory/disk on low-end machines]
-  # When commented out, backend automatically falls back to GEMINI_API_KEY.
-  # To enable: uncomment this service and the 'ollama_data' volume below.
+  # 4. Local Gemma 4 Model Server (Ollama)
+  # Powers local AI distillation without sending data to external APIs.
   # ---------------------------------------------------------------------------
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   container_name: loom-ollama
-  #   restart: unless-stopped
-  #   ports:
-  #     - "11434:11434"
-  #   volumes:
-  #     - ollama_data:/root/.ollama
-  #   environment:
-  #     - OLLAMA_KEEP_ALIVE=24h
-  #   entrypoint: ["/bin/sh", "-c"]
-  #   command:
-  #     - |
-  #       ollama serve &
-  #       sleep 5
-  #       echo "Pulling Gemma model..."
-  #       ollama pull gemma:2b
-  #       wait
+  ollama:
+    image: ollama/ollama:latest
+    container_name: loom-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma4}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ollama serve &
+        sleep 5
+        echo "Pulling Gemma 4 open-source AI model ($${OLLAMA_MODEL:-gemma4})..."
+        ollama pull $${OLLAMA_MODEL:-gemma4} || ollama pull gemma:7b || ollama pull gemma:2b
+        wait
 
 volumes:
   postgres_data:
     name: loom_postgres_data
-  # ollama_data:
-  #   name: loom_ollama_data
+  ollama_data:
+    name: loom_ollama_data

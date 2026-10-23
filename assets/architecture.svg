@@ -1,0 +1,202 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 680" width="100%" height="100%" style="background:#0d1117; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="loomBrand" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e06c49" />
+      <stop offset="100%" stop-color="#c6613f" />
+    </linearGradient>
+    <linearGradient id="gemmaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4285F4" />
+      <stop offset="100%" stop-color="#1A73E8" />
+    </linearGradient>
+    <linearGradient id="dbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#336791" />
+      <stop offset="100%" stop-color="#204d74" />
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1c2128" />
+      <stop offset="100%" stop-color="#161b22" />
+    </linearGradient>
+    <linearGradient id="accentLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#c6613f" stop-opacity="0.2" />
+      <stop offset="50%" stop-color="#c6613f" stop-opacity="1" />
+      <stop offset="100%" stop-color="#c6613f" stop-opacity="0.2" />
+    </linearGradient>
+
+    <!-- Filters for soft glow -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+
+    <!-- Arrow markers -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#c6613f" />
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#4285F4" />
+    </marker>
+    <marker id="arrowMuted" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 8 5 L 0 9 z" fill="#8b949e" />
+    </marker>
+  </defs>
+
+  <!-- Title & Subtitle Header -->
+  <text x="50" y="48" fill="#f0f6fc" font-size="24" font-weight="700" letter-spacing="-0.5">Loom Architecture &amp; Data Pipeline</text>
+  <text x="50" y="74" fill="#8b949e" font-size="14">End-to-end flow from Universal DOM Capture to Canonical Normalization, Gemma 4 Distillation, and Workspace Dashboard</text>
+  <line x1="50" y1="92" x2="1050" y2="92" stroke="url(#accentLine)" stroke-width="2" />
+
+  <!-- ========================================================================= -->
+  <!-- 1. CLIENT & CAPTURE LAYER -->
+  <!-- ========================================================================= -->
+  <rect x="50" y="115" width="280" height="530" rx="14" fill="url(#cardGrad)" stroke="#30363d" stroke-width="1.5" filter="url(#cardShadow)" />
+  <rect x="50" y="115" width="280" height="42" rx="14" fill="#21262d" />
+  <rect x="50" y="145" width="280" height="12" fill="#21262d" />
+  <circle cx="72" cy="136" r="6" fill="#e06c49" />
+  <text x="88" y="141" fill="#f0f6fc" font-size="14" font-weight="600">1. Client &amp; Capture Layer</text>
+
+  <!-- Extension Box -->
+  <rect x="68" y="175" width="244" height="205" rx="10" fill="#0d1117" stroke="#30363d" stroke-width="1.2" />
+  <rect x="80" y="190" width="32" height="32" rx="8" fill="url(#loomBrand)" />
+  <text x="96" y="211" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">L</text>
+  <text x="122" y="204" fill="#f0f6fc" font-size="14" font-weight="600">Chrome Extension</text>
+  <text x="122" y="219" fill="#8b949e" font-size="11">Manifest V3 • TypeScript</text>
+
+  <rect x="80" y="235" width="220" height="30" rx="6" fill="#161b22" stroke="#21262d" />
+  <text x="90" y="254" fill="#58a6ff" font-size="11" font-weight="500">⚡ Single-Click DOM Rescue</text>
+
+  <text x="80" y="285" fill="#8b949e" font-size="11" font-weight="600">PLATFORM ADAPTERS</text>
+  <g fill="#c9d1d9" font-size="11">
+    <rect x="80" y="295" width="68" height="22" rx="4" fill="#21262d" /><text x="114" y="310" text-anchor="middle">ChatGPT</text>
+    <rect x="154" y="295" width="68" height="22" rx="4" fill="#21262d" /><text x="188" y="310" text-anchor="middle">Claude</text>
+    <rect x="228" y="295" width="72" height="22" rx="4" fill="#21262d" /><text x="264" y="310" text-anchor="middle">Gemini</text>
+    <rect x="80" y="323" width="68" height="22" rx="4" fill="#21262d" /><text x="114" y="338" text-anchor="middle">DeepSeek</text>
+    <rect x="154" y="323" width="68" height="22" rx="4" fill="#21262d" /><text x="188" y="338" text-anchor="middle">Grok</text>
+    <rect x="228" y="323" width="72" height="22" rx="4" fill="#21262d" /><text x="264" y="338" text-anchor="middle">Perplexity</text>
+  </g>
+  <text x="80" y="365" fill="#3fb950" font-size="11">✓ Generic Fallback Parser</text>
+
+  <!-- Web App Box -->
+  <rect x="68" y="405" width="244" height="220" rx="10" fill="#0d1117" stroke="#30363d" stroke-width="1.2" />
+  <rect x="80" y="420" width="32" height="32" rx="8" fill="#61DAFB" fill-opacity="0.2" stroke="#61DAFB" />
+  <text x="96" y="441" fill="#61DAFB" font-size="16" font-weight="700" text-anchor="middle">⚛</text>
+  <text x="122" y="434" fill="#f0f6fc" font-size="14" font-weight="600">Web Workspace</text>
+  <text x="122" y="449" fill="#8b949e" font-size="11">React 19 • Vite • TanStack</text>
+
+  <rect x="80" y="465" width="220" height="28" rx="6" fill="#161b22" stroke="#21262d" />
+  <text x="90" y="483" fill="#e06c49" font-size="11" font-weight="500">🖥️ 3-Pane Developer Layout</text>
+
+  <g fill="#8b949e" font-size="11">
+    <text x="84" y="515" fill="#c9d1d9" font-weight="600">Left Pane:</text><text x="145" y="515">Chat Library &amp; Search</text>
+    <text x="84" y="540" fill="#c9d1d9" font-weight="600">Center:</text><text x="135" y="540">Summary &amp; Context.md</text>
+    <text x="84" y="565" fill="#c9d1d9" font-weight="600">Right Pane:</text><text x="150" y="565">Assets &amp; 1-Click ZIP</text>
+  </g>
+  <rect x="80" y="585" width="220" height="26" rx="4" fill="#21262d" />
+  <text x="190" y="602" fill="#3fb950" font-size="11" text-anchor="middle">Dark &amp; Light Themes Supported</text>
+
+  <!-- ========================================================================= -->
+  <!-- 2. INGESTION & BACKEND SERVICE -->
+  <!-- ========================================================================= -->
+  <rect x="375" y="115" width="345" height="530" rx="14" fill="url(#cardGrad)" stroke="#30363d" stroke-width="1.5" filter="url(#cardShadow)" />
+  <rect x="375" y="115" width="345" height="42" rx="14" fill="#21262d" />
+  <rect x="375" y="145" width="345" height="12" fill="#21262d" />
+  <circle cx="397" cy="136" r="6" fill="#58a6ff" />
+  <text x="413" y="141" fill="#f0f6fc" font-size="14" font-weight="600">2. Backend &amp; Ingestion Engine</text>
+
+  <!-- Express Server Box -->
+  <rect x="395" y="175" width="305" height="445" rx="10" fill="#0d1117" stroke="#30363d" stroke-width="1.2" />
+  <text x="415" y="204" fill="#f0f6fc" font-size="14" font-weight="600">Loom Express REST API</text>
+  <text x="415" y="221" fill="#8b949e" font-size="11">Node.js 20+ • TypeScript • Port 4000</text>
+
+  <!-- Steps inside backend -->
+  <rect x="410" y="240" width="275" height="56" rx="8" fill="#161b22" stroke="#30363d" />
+  <text x="424" y="260" fill="#e06c49" font-size="12" font-weight="600">A. Multipart Ingestion (Multer)</text>
+  <text x="424" y="280" fill="#8b949e" font-size="11">Extracts DOM snapshot, messages, and raw assets</text>
+
+  <rect x="410" y="308" width="275" height="66" rx="8" fill="#161b22" stroke="#30363d" />
+  <text x="424" y="328" fill="#58a6ff" font-size="12" font-weight="600">B. TypeScript Normalizer Pipeline</text>
+  <text x="424" y="346" fill="#8b949e" font-size="11">• Parses request-response block cycles</text>
+  <text x="424" y="362" fill="#8b949e" font-size="11">• Builds canonical lossless context.md</text>
+
+  <rect x="410" y="386" width="275" height="74" rx="8" fill="#161b22" stroke="#30363d" />
+  <text x="424" y="406" fill="#bc8cff" font-size="12" font-weight="600">C. Multi-Stage Distillation Worker</text>
+  <text x="424" y="424" fill="#8b949e" font-size="11">• Token estimator (>3000 tokens chunker)</text>
+  <text x="424" y="440" fill="#8b949e" font-size="11">• Generates structured executive summary.md</text>
+  <text x="424" y="454" fill="#8b949e" font-size="11">• Real-time SSE progress streaming</text>
+
+  <rect x="410" y="472" width="275" height="64" rx="8" fill="#161b22" stroke="#30363d" />
+  <text x="424" y="492" fill="#3fb950" font-size="12" font-weight="600">D. Local Disk Storage Isolation</text>
+  <text x="424" y="512" fill="#8b949e" font-size="11">storage/captures/&lt;chatId&gt;/v&lt;version&gt;/</text>
+  <text x="424" y="526" fill="#8b949e" font-size="11">raw/ • assets/ • context.md • summary.md</text>
+
+  <rect x="410" y="548" width="275" height="54" rx="8" fill="#161b22" stroke="#30363d" />
+  <text x="424" y="568" fill="#d29922" font-size="12" font-weight="600">E. Export Streamer (Archiver)</text>
+  <text x="424" y="588" fill="#8b949e" font-size="11">Instant .zip bundles + raw .md downloads</text>
+
+  <!-- ========================================================================= -->
+  <!-- 3. DATA & AI INTELLIGENCE LAYER -->
+  <!-- ========================================================================= -->
+  <rect x="765" y="115" width="285" height="530" rx="14" fill="url(#cardGrad)" stroke="#30363d" stroke-width="1.5" filter="url(#cardShadow)" />
+  <rect x="765" y="115" width="285" height="42" rx="14" fill="#21262d" />
+  <rect x="765" y="145" width="285" height="12" fill="#21262d" />
+  <circle cx="787" cy="136" r="6" fill="#bc8cff" />
+  <text x="803" y="141" fill="#f0f6fc" font-size="14" font-weight="600">3. Data &amp; Intelligence Layer</text>
+
+  <!-- Gemma 4 Box -->
+  <rect x="783" y="175" width="249" height="215" rx="10" fill="#0d1117" stroke="#4285F4" stroke-width="1.5" />
+  <rect x="797" y="190" width="32" height="32" rx="8" fill="url(#gemmaGrad)" />
+  <text x="813" y="211" fill="#ffffff" font-size="14" font-weight="700" text-anchor="middle">G4</text>
+  <text x="839" y="204" fill="#f0f6fc" font-size="14" font-weight="700">Google Gemma 4</text>
+  <text x="839" y="220" fill="#58a6ff" font-size="11">Ollama Container • Port 11434</text>
+
+  <rect x="797" y="235" width="221" height="26" rx="4" fill="#1c2128" />
+  <text x="807" y="252" fill="#3fb950" font-size="11" font-weight="600">🔒 100% On-Device Privacy</text>
+
+  <text x="797" y="280" fill="#8b949e" font-size="11">• Open-weight local execution</text>
+  <text x="797" y="298" fill="#8b949e" font-size="11">• Zero cloud data leakage</text>
+  <text x="797" y="316" fill="#8b949e" font-size="11">• GPU acceleration ready (NVIDIA)</text>
+
+  <!-- Gemini Fallback -->
+  <rect x="797" y="332" width="221" height="44" rx="6" fill="#161b22" stroke="#30363d" stroke-dasharray="3 3" />
+  <text x="807" y="348" fill="#f0f6fc" font-size="11" font-weight="600">🌐 Cloud Fallback Cascade</text>
+  <text x="807" y="364" fill="#8b949e" font-size="10">Google Gemini (gemini-3.1-flash-lite)</text>
+
+  <!-- PostgreSQL Box -->
+  <rect x="783" y="415" width="249" height="210" rx="10" fill="#0d1117" stroke="#336791" stroke-width="1.5" />
+  <rect x="797" y="430" width="32" height="32" rx="8" fill="url(#dbGrad)" />
+  <text x="813" y="451" fill="#ffffff" font-size="14" font-weight="700" text-anchor="middle">🐘</text>
+  <text x="839" y="444" fill="#f0f6fc" font-size="14" font-weight="700">PostgreSQL 16</text>
+  <text x="839" y="460" fill="#58a6ff" font-size="11">Prisma ORM • Port 5432</text>
+
+  <text x="797" y="492" fill="#8b949e" font-size="11" font-weight="600">RELATIONAL SCHEMA</text>
+  <g fill="#c9d1d9" font-size="11">
+    <text x="797" y="512">📊 Chats &amp; Versions (Capture)</text>
+    <text x="797" y="532">💬 Normalized Messages</text>
+    <text x="797" y="552">🖼️ Extracted Assets &amp; Media</text>
+    <text x="797" y="572">📄 Deliverables (context/summary)</text>
+    <text x="797" y="592">⚙️ Asynchronous Job Tracking</text>
+  </g>
+  <text x="797" y="614" fill="#3fb950" font-size="10">Cascading Deletions Enabled</text>
+
+  <!-- ========================================================================= -->
+  <!-- CONNECTING ARROWS & DATA FLOWS -->
+  <!-- ========================================================================= -->
+  <!-- Extension -> Backend API -->
+  <path d="M 312 245 L 395 245" fill="none" stroke="#c6613f" stroke-width="2" marker-end="url(#arrow)" />
+  <text x="353" y="237" fill="#e06c49" font-size="10" font-weight="600" text-anchor="middle">POST DOM</text>
+
+  <!-- Backend API -> Gemma 4 -->
+  <path d="M 700 270 L 783 270" fill="none" stroke="#4285F4" stroke-width="2" marker-end="url(#arrowBlue)" />
+  <text x="741" y="262" fill="#58a6ff" font-size="10" font-weight="600" text-anchor="middle">Distill</text>
+
+  <!-- Gemma 4 -> Backend Summary Output -->
+  <path d="M 783 310 L 700 310" fill="none" stroke="#4285F4" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#arrowBlue)" />
+  <text x="741" y="303" fill="#8b949e" font-size="10" text-anchor="middle">Summary.md</text>
+
+  <!-- Backend -> PostgreSQL -->
+  <path d="M 700 500 L 783 500" fill="none" stroke="#336791" stroke-width="2" marker-end="url(#arrow)" />
+  <text x="741" y="492" fill="#58a6ff" font-size="10" font-weight="600" text-anchor="middle">Prisma ORM</text>
+
+  <!-- Web App <-> Backend API -->
+  <path d="M 312 510 L 395 510" fill="none" stroke="#8b949e" stroke-width="2" marker-end="url(#arrowMuted)" />
+  <text x="353" y="502" fill="#8b949e" font-size="10" font-weight="600" text-anchor="middle">REST / SSE</text>
+</svg>
