@@ -31,8 +31,8 @@ export async function generateWithLocalGemma(
   systemPrompt?: string
 ): Promise<string> {
   const controller = new AbortController();
-  // 90-second timeout for local CPU/GPU inference on longer context
-  const timeout = setTimeout(() => controller.abort(), 90000);
+  // Configurable timeout for local CPU/GPU inference on longer context
+  const timeout = setTimeout(() => controller.abort(), env.OLLAMA_TIMEOUT_MS);
 
   try {
     const res = await fetch(`${env.OLLAMA_BASE_URL}/api/generate`, {
@@ -171,7 +171,19 @@ export async function generateWithFallback(
   prompt: string,
   systemPrompt?: string
 ): Promise<LlmGenerationResult> {
-  // Step 1: Check if local Ollama is running and available
+  // STRICT MODE: Gemma only. No cloud fallback, errors are surfaced loudly.
+  if (env.GEMMA_ONLY) {
+    console.log(`🤖 [GEMMA_ONLY] Using local Gemma via Ollama (${env.OLLAMA_MODEL}) at ${env.OLLAMA_BASE_URL}`);
+    const text = await generateWithLocalGemma(prompt, systemPrompt);
+    console.log(`✅ Local Gemma generated output (${text.length} chars)`);
+    return {
+      text,
+      provider: 'GEMMA_LOCAL',
+      model: env.OLLAMA_MODEL,
+    };
+  }
+
+  // NORMAL MODE: try Gemma first, then Gemini fallback
   const ollamaOnline = await isOllamaAvailable();
   if (ollamaOnline) {
     try {

@@ -1,36 +1,46 @@
 import { Request, Response } from 'express';
+import { env } from '../../config/env';
+import { isOllamaAvailable } from '../../utils/ai';
 
-/**
- * GET /api/config and GET /config — Public runtime configuration and extension handshake.
- *
- * Used by the browser extension upon opening to:
- * 1. Verify server connectivity and authorization.
- * 2. Check if local Gemma / Gemini fallback is available for summarization.
- * 3. Discover limits and supported platforms.
- */
 export async function getConfigController(_req: Request, res: Response) {
+  const ollamaOnline = await isOllamaAvailable();
+  const hasGemini =
+    !!env.GEMINI_API_KEY &&
+    env.GEMINI_API_KEY.trim() !== '' &&
+    !env.GEMINI_API_KEY.includes('your-key');
 
-  // Check if LLM summarization is available (Ollama or Gemini API key configured)
-  const hasGemini = !!process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.includes('your-key');
-  const hasOllama = !!process.env.OLLAMA_BASE_URL;
-  const gemmaEnabled = hasGemini || hasOllama;
+  let llmProvider: 'GEMMA_LOCAL' | 'GEMINI_FALLBACK' | 'NONE';
+  let llmModel: string;
+  let llmAvailable: boolean;
 
-  const llmProvider = hasOllama ? 'GEMMA_LOCAL' : hasGemini ? 'GEMINI_FALLBACK' : 'NONE';
-  const llmModel = hasOllama
-    ? (process.env.OLLAMA_MODEL || 'gemma4')
-    : hasGemini
-    ? (process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite')
-    : 'none';
+  if (env.GEMMA_ONLY) {
+    llmProvider = 'GEMMA_LOCAL';
+    llmModel = env.OLLAMA_MODEL;
+    llmAvailable = ollamaOnline;
+  } else if (ollamaOnline) {
+    llmProvider = 'GEMMA_LOCAL';
+    llmModel = env.OLLAMA_MODEL;
+    llmAvailable = true;
+  } else if (hasGemini) {
+    llmProvider = 'GEMINI_FALLBACK';
+    llmModel = env.GEMINI_MODEL;
+    llmAvailable = true;
+  } else {
+    llmProvider = 'NONE';
+    llmModel = 'none';
+    llmAvailable = false;
+  }
 
   return res.status(200).json({
     version: '1.0.0',
     authorized: true,
-    gemmaEnabled,
+    gemmaEnabled: llmAvailable,
+    gemmaOnly: env.GEMMA_ONLY,
     defaultMode: 'context',
     llm: {
       provider: llmProvider,
       model: llmModel,
-      available: gemmaEnabled,
+      available: llmAvailable,
     },
     supportedPlatforms: [
       'CHATGPT',

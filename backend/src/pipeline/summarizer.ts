@@ -1,4 +1,5 @@
 import { generateWithFallback, LlmGenerationResult } from '../utils/ai';
+import { env } from '../config/env';
 
 export interface SummarizeProgressCallback {
   (stage: string, progress: number): void | Promise<void>;
@@ -176,7 +177,7 @@ ${contextMarkdown}
 
   const intermediateNotes: string[] = [];
   let lastProvider = 'GEMMA_LOCAL';
-  let lastModel = 'gemma:2b';
+  let lastModel = env.OLLAMA_MODEL;
 
   // Stage 1: Map — Extract technical notes from each chunk
   for (let i = 0; i < chunks.length; i++) {

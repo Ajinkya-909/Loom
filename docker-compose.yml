@@ -36,7 +36,9 @@ services:
       PORT: ${BACKEND_PORT:-4000}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-loom_db}?schema=public
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4:e2b}
+      GEMMA_ONLY: ${GEMMA_ONLY:-true}
+      OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-300000}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
     ports:
@@ -45,6 +47,8 @@ services:
       - ./backend/storage:/app/storage
     depends_on:
       postgres:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
 
   # ---------------------------------------------------------------------------
@@ -80,15 +84,21 @@ services:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_KEEP_ALIVE=24h
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma4}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma4:e2b}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
         ollama serve &
         sleep 5
-        echo "Pulling Gemma 4 open-source AI model ($${OLLAMA_MODEL:-gemma4})..."
-        ollama pull $${OLLAMA_MODEL:-gemma4} || ollama pull gemma:7b || ollama pull gemma:2b
+        echo "Pulling Gemma 4 open-source AI model ($${OLLAMA_MODEL:-gemma4:e2b})..."
+        ollama pull $${OLLAMA_MODEL:-gemma4:e2b}
         wait
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list | grep -q \"$$OLLAMA_MODEL\""]
+      interval: 10s
+      timeout: 5s
+      retries: 90
+      start_period: 20s
 
 volumes:
   postgres_data:
